@@ -1,0 +1,40 @@
+{
+  "name": "photoclass",
+  "main": "node_modules/expo/AppEntry.js",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/react-native-action-sheet": "^4.1.1",
+    "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/slider": "^5.0.1",
+    "@react-navigation/bottom-tabs": "^7.4.6",
+    "@react-navigation/native": "^7.1.17",
+    "@react-navigation/stack": "^7.4.7",
+    "@types/react": "~19.0.10",
+    "expo": "~53.0.20",
+    "expo-camera": "^16.1.11",
+    "expo-document-picker": "~13.1.6",
+    "expo-file-system": "^18.1.11",
+    "expo-image-picker": "^16.1.4",
+    "expo-media-library": "~17.1.7",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-modal": "^14.0.0-rc.1",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-web": "~0.20.0",
+    "typescript": "~5.8.3",
+    "@expo/metro-runtime": "~5.0.4",
+    "expo-dev-client": "~5.2.4"
+  },
+  "private": true
+}

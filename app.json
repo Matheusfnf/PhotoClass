@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "PhotoClass",
+    "slug": "PhotoClass",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "photoclass",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir que o PhotoClass acesse sua câmera"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Permitir que o PhotoClass acesse suas fotos",
+          "savePhotosPermission": "Permitir que o PhotoClass salve fotos"
+        }
+      ]
+    ]
+  }
+}
