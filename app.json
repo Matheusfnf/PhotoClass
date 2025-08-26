@@ -16,7 +16,14 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "package": "com.matheusfnf.PhotoClass"
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +43,11 @@
           "savePhotosPermission": "Permitir que o PhotoClass salve fotos"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a1cb46f5-8127-4c9e-a9a7-7eeb351bc028"
+      }
+    }
   }
 }
