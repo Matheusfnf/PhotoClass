@@ -7,14 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "photoclass",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#4A90E2"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [

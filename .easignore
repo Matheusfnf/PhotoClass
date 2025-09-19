@@ -1,0 +1,20 @@
+# Arquivos e diretórios que podem causar problemas de permissão
+.git/
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+*.tmp
+*.cache
+
+# Node modules (será reinstalado no build)
+node_modules/
+
+# Arquivos de desenvolvimento local
+.expo/
+.expo-shared/
+
+# Arquivos de sistema Windows
+desktop.ini
+*.lnk

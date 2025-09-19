@@ -9,18 +9,27 @@
       "distribution": "internal",
       "env": {
         "NODE_OPTIONS": "--max-old-space-size=4096"
+      },
+      "cache": {
+        "disabled": true
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
         "NODE_OPTIONS": "--max-old-space-size=4096"
+      },
+      "cache": {
+        "disabled": true
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "NODE_OPTIONS": "--max-old-space-size=4096"
+      },
+      "cache": {
+        "disabled": true
       }
     }
   },
