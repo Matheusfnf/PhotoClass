@@ -1,5 +1,5 @@
 // Utilitário para compatibilidade entre web e mobile para operações de arquivo
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Detectar se estamos rodando na web
 const isWeb = typeof window !== 'undefined' && window.localStorage;
@@ -256,6 +256,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.getInfoAsync(path);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.getInfoAsync(path);
     }
   },
@@ -264,6 +265,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.makeDirectoryAsync(path, options);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.makeDirectoryAsync(path, options);
     }
   },
@@ -272,6 +274,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.readDirectoryAsync(path);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.readDirectoryAsync(path);
     }
   },
@@ -280,6 +283,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.writeAsStringAsync(path, content, options);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.writeAsStringAsync(path, content, options);
     }
   },
@@ -288,6 +292,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.readAsStringAsync(path, options);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.readAsStringAsync(path, options);
     }
   },
@@ -296,6 +301,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.deleteAsync(path, options);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.deleteAsync(path, options);
     }
   },
@@ -304,6 +310,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.copyAsync(options);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.copyAsync(options);
     }
   },
@@ -312,6 +319,7 @@ export const FileSystemCompat = {
     if (isWeb) {
       return await WebFileSystem.moveAsync(options);
     } else {
+      // Usar API legada diretamente para evitar problemas
       return await FileSystem.moveAsync(options);
     }
   },

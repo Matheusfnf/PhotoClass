@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystemCompat from 'expo-file-system';
+import FileSystemCompat from './FileSystemCompat';
 
 /**
  * Gera o próximo número sequencial para uma pasta específica

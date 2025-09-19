@@ -42,12 +42,14 @@
           "photosPermission": "Permitir que o PhotoClass acesse suas fotos",
           "savePhotosPermission": "Permitir que o PhotoClass salve fotos"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
         "projectId": "a1cb46f5-8127-4c9e-a9a7-7eeb351bc028"
       }
-    }
+    },
+    "owner": "matheusfnf"
   }
 }
