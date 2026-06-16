@@ -1,0 +1,134 @@
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from 'react';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+
+export interface UserProfile {
+  id: string;
+  plan_tier: 'free' | 'premium';
+  theme: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  profile: UserProfile | null;
+  session: Session | null;
+  isLoading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  profile: null,
+  session: null,
+  isLoading: true,
+  signIn: async () => ({ error: null }),
+  signUp: async () => ({ error: null }),
+  signOut: async () => {},
+  refreshProfile: async () => {},
+});
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setProfile(null);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+      if (!error && data) {
+        setProfile(data as UserProfile);
+      }
+    } catch (e) {
+      console.error('Failed to fetch profile', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        refreshProfile().finally(() => setIsLoading(false));
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          refreshProfile().finally(() => setIsLoading(false));
+        } else {
+          setProfile(null);
+          setIsLoading(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [refreshProfile]);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: translateAuthError(error.message) };
+    return { error: null };
+  }, []);
+
+  const signUp = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: translateAuthError(error.message) };
+    return { error: null };
+  }, []);
+
+  const signOut = useCallback(async () => {
+    if (user) {
+      const { wipeUserLocalData } = require('@/lib/database');
+      await wipeUserLocalData(user.id);
+    }
+    await supabase.auth.signOut();
+  }, [user]);
+
+  return (
+    <AuthContext.Provider value={{ user, profile, session, isLoading, signIn, signUp, signOut, refreshProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Traduz mensagens de erro do Supabase para português
+function translateAuthError(msg: string): string {
+  if (msg.includes('Invalid login credentials')) return 'Email ou senha incorretos.';
+  if (msg.includes('Email not confirmed')) return 'Confirme seu email antes de entrar.';
+  if (msg.includes('User already registered')) return 'Este email já está cadastrado.';
+  if (msg.includes('Password should be')) return 'A senha deve ter pelo menos 6 caracteres.';
+  if (msg.includes('Unable to validate email')) return 'Email inválido.';
+  if (msg.includes('rate limit')) return 'Muitas tentativas. Aguarde um momento.';
+  return msg;
+}
