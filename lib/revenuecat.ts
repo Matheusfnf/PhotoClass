@@ -7,13 +7,44 @@ import { Platform } from 'react-native';
 const API_KEY_APPLE = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_KEY || '';
 const API_KEY_GOOGLE = process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY || '';
 
+/** Nome do entitlement configurado no painel do RevenueCat (case-sensitive). */
+const PREMIUM_ENTITLEMENT = 'Premium';
+
+const hasKeys = () => Boolean(API_KEY_APPLE || API_KEY_GOOGLE);
+
 export const initRevenueCat = () => {
-  if (Platform.OS === 'ios' && API_KEY_APPLE) {
-    Purchases.configure({ apiKey: API_KEY_APPLE });
-  } else if (Platform.OS === 'android' && API_KEY_GOOGLE) {
-    Purchases.configure({ apiKey: API_KEY_GOOGLE });
-  } else {
-    console.log("⚠️ RevenueCat: Chaves não configuradas. Simulação ativa.");
+  try {
+    if (Platform.OS === 'ios' && API_KEY_APPLE) {
+      Purchases.configure({ apiKey: API_KEY_APPLE });
+    } else if (Platform.OS === 'android' && API_KEY_GOOGLE) {
+      Purchases.configure({ apiKey: API_KEY_GOOGLE });
+    } else {
+      console.log("⚠️ RevenueCat: Chaves não configuradas. Simulação ativa.");
+    }
+  } catch (e) {
+    // No Expo Go o módulo nativo (RNPurchases) não existe → configure() lança.
+    // Ignoramos para não derrubar o startup; IAP só funciona em dev build / produção.
+    console.log("⚠️ RevenueCat: módulo nativo indisponível (Expo Go?). IAP desativado nesta sessão.");
+  }
+};
+
+/** Vincula as compras à conta do usuário (Supabase id). Seguro em qualquer ambiente. */
+export const loginRevenueCat = async (userId: string) => {
+  try {
+    if (!hasKeys()) return;
+    await Purchases.logIn(userId);
+  } catch (e) {
+    console.log("RevenueCat: logIn falhou (Expo Go ou não configurado).");
+  }
+};
+
+/** Desvincula o usuário ao deslogar. Seguro em qualquer ambiente. */
+export const logoutRevenueCat = async () => {
+  try {
+    if (!hasKeys()) return;
+    await Purchases.logOut();
+  } catch (e) {
+    // Lança se o usuário já for anônimo — ignoramos.
   }
 };
 
@@ -47,12 +78,11 @@ export const purchasePremium = async (pkg?: any) => {
     }
 
     const { customerInfo } = await Purchases.purchasePackage(pkg);
-    
-    // Supondo que o Entitlement configurado no painel do RC se chame "Premium"
-    if (typeof customerInfo.entitlements.active['Premium'] !== "undefined") {
+
+    if (typeof customerInfo.entitlements.active[PREMIUM_ENTITLEMENT] !== "undefined") {
       return true;
     }
-    
+
     return false;
   } catch (error: any) {
     if (!error.userCancelled) {
@@ -67,7 +97,7 @@ export const restorePurchases = async () => {
     if (!API_KEY_APPLE && !API_KEY_GOOGLE) return false;
 
     const customerInfo = await Purchases.restorePurchases();
-    if (typeof customerInfo.entitlements.active['Premium'] !== "undefined") {
+    if (typeof customerInfo.entitlements.active[PREMIUM_ENTITLEMENT] !== "undefined") {
       return true;
     }
     return false;

@@ -11,6 +11,7 @@ import { DatabaseProvider } from '@/context/DatabaseContext';
 import { SyncProvider } from '@/context/SyncContext';
 import { SyncGate } from '@/components/SyncGate';
 import { AppColors } from '@/constants/design';
+import { initRevenueCat, loginRevenueCat, logoutRevenueCat } from '@/lib/revenuecat';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -37,9 +38,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!user && !inAuthGroup) {
       router.replace('/auth');
     } else if (user && inAuthGroup) {
-      router.replace('/(tabs)');
+      router.replace('/');
     }
   }, [user, isLoading, segments]);
+
+  // Vincula/desvincula a conta do usuário no RevenueCat para atribuir as compras.
+  useEffect(() => {
+    if (user) {
+      loginRevenueCat(user.id);
+    } else {
+      logoutRevenueCat();
+    }
+  }, [user?.id]);
 
   return <>{children}</>;
 }
@@ -48,6 +58,11 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const scheme = colorScheme ?? 'dark';
   const colors = AppColors[scheme];
+
+  // Configura o RevenueCat uma vez no startup (no-op seguro no Expo Go).
+  useEffect(() => {
+    initRevenueCat();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

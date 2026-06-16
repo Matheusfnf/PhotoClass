@@ -70,7 +70,7 @@ export default function OnboardingScreen() {
       if (router.canGoBack()) {
         router.back();
       } else {
-        router.replace('/(tabs)');
+        router.replace('/');
       }
     }
   };
