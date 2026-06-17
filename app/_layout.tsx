@@ -33,11 +33,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === 'auth' || segments[0] === 'onboarding';
+    // 'onboarding' é exibido para usuários LOGADOS (a home empurra o onboarding para
+    // quem ainda não o viu). Por isso ele NÃO pode entrar na regra que redireciona
+    // usuários logados de volta para '/', senão home↔onboarding entram em loop infinito
+    // de navegação (tela piscando / UI travada). Só o 'auth' expulsa o usuário logado.
+    const inAuthScreen = segments[0] === 'auth';
+    const inOnboarding = segments[0] === 'onboarding';
 
-    if (!user && !inAuthGroup) {
+    if (!user && !inAuthScreen && !inOnboarding) {
       router.replace('/auth');
-    } else if (user && inAuthGroup) {
+    } else if (user && inAuthScreen) {
       router.replace('/');
     }
   }, [user, isLoading, segments]);

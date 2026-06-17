@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,11 @@ export default function HomeScreen() {
 
   const { isSyncing } = useSync();
 
+  // Garante que o onboarding seja empurrado no máximo uma vez por montagem.
+  // Sem isso, o efeito abaixo re-executa quando `isSyncing`/`loadSpaces` mudam e
+  // chama router.push('/onboarding') repetidamente, empilhando telas e fazendo a UI piscar.
+  const onboardingPushedRef = useRef(false);
+
   useEffect(() => {
     // Verificar onboarding na primeira vez e criar espaço de exemplo
     const checkFirstTime = async () => {
@@ -61,7 +66,12 @@ export default function HomeScreen() {
       try {
         const seen = await AsyncStorage.getItem('@photoclass_onboarding_seen');
         if (!seen) {
-          router.push('/onboarding');
+          if (!onboardingPushedRef.current) {
+            onboardingPushedRef.current = true;
+            router.push('/onboarding');
+          }
+          // Espera o usuário concluir o onboarding antes de criar o espaço de exemplo.
+          return;
         }
 
         const exampleCreated = await AsyncStorage.getItem('@photoclass_example_created');

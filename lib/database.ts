@@ -10,6 +10,33 @@ function dbName(userId: string) {
 }
 
 /**
+ * Serializa todas as operações assíncronas do banco numa fila (uma de cada vez).
+ *
+ * O expo-sqlite no Android lança `NativeDatabase.prepareAsync ... NullPointerException`
+ * quando dois statements são preparados concorrentemente na mesma conexão
+ * (ver https://github.com/expo/expo/issues/28176). No startup isso acontece porque o
+ * sync (runSync) roda junto com as queries da home (getAllSpaces / checkFirstTime).
+ * A fila garante que nunca há dois prepareAsync simultâneos.
+ */
+function serializeDatabase(db: SQLite.SQLiteDatabase): SQLite.SQLiteDatabase {
+  let queue: Promise<unknown> = Promise.resolve();
+  const methods = ['execAsync', 'runAsync', 'getFirstAsync', 'getAllAsync'] as const;
+
+  for (const name of methods) {
+    const original = (db as any)[name];
+    if (typeof original !== 'function') continue;
+    (db as any)[name] = (...args: any[]) => {
+      const run = queue.then(() => original.apply(db, args));
+      // Mantém a fila viva mesmo se uma chamada falhar (não propaga o erro pra próxima).
+      queue = run.catch(() => {});
+      return run;
+    };
+  }
+
+  return db;
+}
+
+/**
  * Retorna (ou abre/cria) o banco do usuário especificado.
  * Se outro banco estava aberto, fecha antes de abrir o novo.
  */
@@ -32,7 +59,7 @@ export async function openDatabaseForUser(userId: string): Promise<SQLite.SQLite
 
   _openForUserId = userId;
   _dbPromise = (async () => {
-    const db = await SQLite.openDatabaseAsync(dbName(userId));
+    const db = serializeDatabase(await SQLite.openDatabaseAsync(dbName(userId)));
     await runMigrations(db);
     return db;
   })();
