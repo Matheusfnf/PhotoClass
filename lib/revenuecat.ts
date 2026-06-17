@@ -7,8 +7,12 @@ import { Platform } from 'react-native';
 const API_KEY_APPLE = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_KEY || '';
 const API_KEY_GOOGLE = process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY || '';
 
-/** Nome do entitlement configurado no painel do RevenueCat (case-sensitive). */
-const PREMIUM_ENTITLEMENT = 'Premium';
+/**
+ * Identifier do entitlement configurado no painel do RevenueCat (case-sensitive,
+ * inclui o espaço). Precisa bater EXATAMENTE com o identifier do entitlement —
+ * é 'PhotoClass Pro', não 'Premium'.
+ */
+const PREMIUM_ENTITLEMENT = 'PhotoClass Pro';
 
 const hasKeys = () => Boolean(API_KEY_APPLE || API_KEY_GOOGLE);
 
