@@ -86,7 +86,7 @@ export default function RootLayout() {
                     }}
                   >
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="auth" options={{ headerShown: false }} />
+                    <Stack.Screen name="auth/index" options={{ headerShown: false }} />
                     <Stack.Screen name="onboarding" options={{ headerShown: false, presentation: 'modal' }} />
                     <Stack.Screen name="space/new" options={{ title: 'Novo Espaço', presentation: 'modal' }} />
                     <Stack.Screen name="folder/new" options={{ title: 'Nova Pasta', presentation: 'modal' }} />
