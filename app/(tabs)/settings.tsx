@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { formatFileSize } from '@/lib/files';
 import { useAuth } from '@/context/AuthContext';
 import { useSync } from '@/context/SyncContext';
 import { supabase } from '@/lib/supabase';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 
 export default function AccountScreen() {
   const scheme = useColorScheme() ?? 'dark';
@@ -440,6 +441,16 @@ export default function AccountScreen() {
           </>
         )}
 
+        <View style={styles.legalRow}>
+          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
+            <Text style={[styles.legalLink, { color: colors.textMuted }]}>Política de Privacidade</Text>
+          </Pressable>
+          <Text style={{ color: colors.textMuted }}> · </Text>
+          <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
+            <Text style={[styles.legalLink, { color: colors.textMuted }]}>Termos de Uso</Text>
+          </Pressable>
+        </View>
+
         <Text style={[styles.footer, { color: colors.textMuted }]}>
           PhotoClass v1.0.0 · Feito com 💜
         </Text>
@@ -683,6 +694,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 99,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Spacing.xl,
+  },
+  legalLink: {
+    fontSize: FontSize.xs,
+    textDecorationLine: 'underline',
   },
   footer: {
     textAlign: 'center',

@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { purchasePremium, restorePurchases, getManagementURL } from '@/lib/revenuecat';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 
 /** Fallback caso o RevenueCat não devolva a managementURL. */
 const PLAY_SUBSCRIPTIONS_URL =
@@ -192,12 +193,18 @@ export default function PaywallScreen() {
         )}
 
         <View style={styles.footerLinks}>
-          <Pressable><Text style={[styles.footerLink, { color: colors.textMuted }]}>Termos de Uso</Text></Pressable>
+          <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
+            <Text style={[styles.footerLink, { color: colors.textMuted }]}>Privacidade</Text>
+          </Pressable>
+          <Text style={{ color: colors.textMuted }}>•</Text>
+          <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
+            <Text style={[styles.footerLink, { color: colors.textMuted }]}>Termos</Text>
+          </Pressable>
           {!isPremium && <Text style={{ color: colors.textMuted }}>•</Text>}
           {!isPremium && (
             <Pressable onPress={handleRestore} disabled={restoring}>
               <Text style={[styles.footerLink, { color: colors.textMuted }]}>
-                {restoring ? 'Restaurando…' : 'Restaurar Compra'}
+                {restoring ? 'Restaurando…' : 'Restaurar'}
               </Text>
             </Pressable>
           )}
