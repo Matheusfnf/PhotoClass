@@ -12,6 +12,17 @@ import { SyncProvider } from '@/context/SyncContext';
 import { SyncGate } from '@/components/SyncGate';
 import { AppColors } from '@/constants/design';
 import { initRevenueCat, loginRevenueCat, logoutRevenueCat } from '@/lib/revenuecat';
+import * as Sentry from '@sentry/react-native';
+
+// Crash/erro reporting. Só inicializa se houver DSN (EXPO_PUBLIC_SENTRY_DSN) — em dev
+// ou sem chave configurada, vira no-op. Captura erros JS não tratados e crashes nativos.
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    sendDefaultPii: false, // não envia e-mail/PII por padrão
+    tracesSampleRate: 0.2,  // amostragem leve de performance
+  });
+}
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -59,7 +70,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
   const scheme = colorScheme ?? 'dark';
   const colors = AppColors[scheme];
@@ -103,3 +114,6 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// Sentry.wrap habilita a captura de erros de render do React e o monitoramento.
+export default Sentry.wrap(RootLayout);
