@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, ActivityIndicator, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, FontSize, FontWeight, Spacing, BorderRadius, Palette } from '@/constants/design';
 import { LinearGradient } from 'expo-linear-gradient';
-import { purchasePremium, restorePurchases } from '@/lib/revenuecat';
+import { purchasePremium, restorePurchases, getManagementURL } from '@/lib/revenuecat';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+
+/** Fallback caso o RevenueCat não devolva a managementURL. */
+const PLAY_SUBSCRIPTIONS_URL =
+  'https://play.google.com/store/account/subscriptions?package=com.matheusfnf.PhotoClass';
 
 const { width } = Dimensions.get('window');
 
@@ -16,9 +20,11 @@ export default function PaywallScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [packageToBuy, setPackageToBuy] = useState<any>(null);
   const [priceString, setPriceString] = useState('R$ 9,90');
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
+  const isPremium = profile?.plan_tier === 'premium';
 
   React.useEffect(() => {
     const fetchOfferings = async () => {
@@ -49,6 +55,31 @@ export default function PaywallScreen() {
     setLoading(false);
   };
 
+  const handleRestore = async () => {
+    setRestoring(true);
+    const ok = await restorePurchases();
+    if (ok && user) {
+      await supabase.from('profiles').update({ plan_tier: 'premium' }).eq('id', user.id);
+      await refreshProfile();
+      Alert.alert('Compra restaurada', 'Bem-vindo de volta ao PhotoClass Pro! 💜');
+      router.back();
+    } else {
+      Alert.alert('Nada para restaurar', 'Não encontramos uma assinatura ativa nesta conta.');
+    }
+    setRestoring(false);
+  };
+
+  const handleManage = async () => {
+    // Cancelamento/gestão é feito na Play Store (política do Google). Encaminhamos
+    // pra URL de gestão do RevenueCat; se indisponível, pro painel de assinaturas da Play.
+    const url = (await getManagementURL()) ?? PLAY_SUBSCRIPTIONS_URL;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Ops', 'Não foi possível abrir a tela de assinaturas da Play Store.');
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} bounces={false}>
@@ -72,9 +103,13 @@ export default function PaywallScreen() {
               <Ionicons name="star" size={48} color="#FFF" />
             </LinearGradient>
           </View>
-          <Text style={[styles.title, { color: colors.text }]}>PhotoClass Pro</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {isPremium ? 'Você é PhotoClass Pro' : 'PhotoClass Pro'}
+          </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Desbloqueie todo o potencial dos seus estudos e eleve sua organização a outro nível.
+            {isPremium
+              ? 'Sua assinatura está ativa. Obrigado por apoiar o PhotoClass! 💜'
+              : 'Desbloqueie todo o potencial dos seus estudos e eleve sua organização a outro nível.'}
           </Text>
         </View>
 
@@ -110,31 +145,62 @@ export default function PaywallScreen() {
 
       {/* Footer / CTA */}
       <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.borderLight }]}>
-        <View style={styles.priceContainer}>
-          <Text style={[styles.priceValue, { color: colors.text }]}>{priceString}</Text>
-        </View>
-        
-        <Pressable onPress={handleSubscribe} disabled={loading}>
-          {({ pressed }) => (
-            <LinearGradient
-              colors={[Palette.indigo500, Palette.indigo600]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.subscribeBtn, { opacity: (pressed || loading) ? 0.8 : 1 }]}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.subscribeBtnText}>Assinar Agora</Text>
+        {isPremium ? (
+          <>
+            <View style={styles.activeRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={[styles.activeText, { color: colors.success }]}>Sua assinatura Pro está ativa</Text>
+            </View>
+
+            <Pressable onPress={handleManage}>
+              {({ pressed }) => (
+                <View
+                  style={[
+                    styles.manageBtn,
+                    { borderColor: colors.border, backgroundColor: colors.surfaceElevated, opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Ionicons name="settings-outline" size={18} color={colors.text} style={{ marginRight: 8 }} />
+                  <Text style={[styles.manageBtnText, { color: colors.text }]}>Gerenciar / Cancelar assinatura</Text>
+                </View>
               )}
-            </LinearGradient>
-          )}
-        </Pressable>
-        
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <View style={styles.priceContainer}>
+              <Text style={[styles.priceValue, { color: colors.text }]}>{priceString}</Text>
+            </View>
+
+            <Pressable onPress={handleSubscribe} disabled={loading}>
+              {({ pressed }) => (
+                <LinearGradient
+                  colors={[Palette.indigo500, Palette.indigo600]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.subscribeBtn, { opacity: (pressed || loading) ? 0.8 : 1 }]}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.subscribeBtnText}>Assinar Agora</Text>
+                  )}
+                </LinearGradient>
+              )}
+            </Pressable>
+          </>
+        )}
+
         <View style={styles.footerLinks}>
           <Pressable><Text style={[styles.footerLink, { color: colors.textMuted }]}>Termos de Uso</Text></Pressable>
-          <Text style={{ color: colors.textMuted }}>•</Text>
-          <Pressable><Text style={[styles.footerLink, { color: colors.textMuted }]}>Restaurar Compra</Text></Pressable>
+          {!isPremium && <Text style={{ color: colors.textMuted }}>•</Text>}
+          {!isPremium && (
+            <Pressable onPress={handleRestore} disabled={restoring}>
+              <Text style={[styles.footerLink, { color: colors.textMuted }]}>
+                {restoring ? 'Restaurando…' : 'Restaurar Compra'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -271,6 +337,30 @@ const styles = StyleSheet.create({
   subscribeBtnText: {
     color: '#FFF',
     fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  activeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: Spacing.lg,
+  },
+  activeText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+  },
+  manageBtn: {
+    height: 56,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  manageBtnText: {
+    fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
   },
   footerLinks: {

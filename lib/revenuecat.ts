@@ -110,3 +110,20 @@ export const restorePurchases = async () => {
     return false;
   }
 };
+
+/**
+ * URL para o usuário gerenciar/cancelar a assinatura. O RevenueCat devolve o link
+ * direto da loja (Play Store no Android). Cancelamento de assinatura é sempre feito
+ * na loja, por política do Google/Apple — o app só pode encaminhar pra lá.
+ * Retorna null se não houver assinatura gerenciável (ex.: comprada em outra plataforma).
+ */
+export const getManagementURL = async (): Promise<string | null> => {
+  try {
+    if (!hasKeys()) return null;
+    const customerInfo = await Purchases.getCustomerInfo();
+    return customerInfo.managementURL ?? null;
+  } catch (error) {
+    console.log("RevenueCat: getManagementURL falhou.", error);
+    return null;
+  }
+};
