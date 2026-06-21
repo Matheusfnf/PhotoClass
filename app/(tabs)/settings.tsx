@@ -35,6 +35,40 @@ export default function AccountScreen() {
     );
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Excluir conta',
+      'Isso apaga PERMANENTEMENTE sua conta, todos os espaços, pastas, arquivos e o backup na nuvem. Não há como desfazer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir tudo',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              // A exclusão da conta de auth roda no servidor (Edge Function) com a
+              // service role — o JWT do usuário vai automático no header.
+              const { error } = await supabase.functions.invoke('delete-account');
+              if (error) throw error;
+              // Limpa o cache local e encerra a sessão.
+              if (user) {
+                const { wipeUserLocalData } = require('@/lib/database');
+                await wipeUserLocalData(user.id);
+              }
+              await supabase.auth.signOut();
+            } catch (e) {
+              Alert.alert('Erro', 'Não foi possível excluir a conta agora. Tente novamente em instantes.');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleThemeChange = async (newTheme: string) => {
     if (profile?.plan_tier !== 'premium' && newTheme !== 'default' && newTheme !== 'light' && newTheme !== 'dark') {
       router.push('/paywall');
@@ -336,6 +370,30 @@ export default function AccountScreen() {
                 <Ionicons name="log-out-outline" size={18} color={colors.error} />
               </View>
               <Text style={[styles.rowLabel, { color: colors.error }]}>Sair da conta</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.error + '80'} />
+          </Pressable>
+
+          <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
+
+          {/* Excluir conta (exigência da Play: exclusão de conta + dados) */}
+          <Pressable
+            onPress={handleDeleteAccount}
+            disabled={deleting}
+            style={({ pressed }) => [styles.row, { opacity: pressed || deleting ? 0.6 : 1 }]}
+          >
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconWrap, { backgroundColor: colors.error + '15' }]}>
+                {deleting ? (
+                  <ActivityIndicator size={16} color={colors.error} />
+                ) : (
+                  <Ionicons name="trash-outline" size={18} color={colors.error} />
+                )}
+              </View>
+              <View>
+                <Text style={[styles.rowLabel, { color: colors.error }]}>Excluir conta</Text>
+                <Text style={[styles.rowSub, { color: colors.textMuted }]}>Apaga tudo permanentemente</Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.error + '80'} />
           </Pressable>
