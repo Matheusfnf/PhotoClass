@@ -108,12 +108,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    if (user) {
-      const { wipeUserLocalData } = require('@/lib/database');
-      await wipeUserLocalData(user.id);
+    // Empurra mudanças locais pendentes pra nuvem ANTES de sair — senão dados criados
+    // pouco antes do logout (que ainda não passaram pelo sync com debounce de 30s) se
+    // perderiam. Best-effort: se falhar (ex.: offline), seguimos. NÃO apagamos o cache
+    // local (a tela de logout promete "seus dados continuam salvos no dispositivo"); os
+    // dados ficam e sobem no próximo login.
+    try {
+      const { runSync } = require('@/lib/sync');
+      await runSync();
+    } catch (e) {
+      console.warn('[Auth] Sync final no logout falhou (seguindo mesmo assim):', e);
     }
     await supabase.auth.signOut();
-  }, [user]);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, profile, session, isLoading, signIn, signUp, signOut, refreshProfile }}>
