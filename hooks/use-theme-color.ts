@@ -10,7 +10,10 @@ export function useThemeColor(
   props: { light?: string; dark?: string },
   colorName: keyof typeof Colors.light & keyof typeof Colors.dark
 ) {
-  const theme = useColorScheme() ?? 'light';
+  // useColorScheme pode devolver temas custom (premium); o mapa Colors do template
+  // só tem light/dark, então normalizamos: 'light' → claro, qualquer outro → escuro.
+  const scheme = useColorScheme();
+  const theme: 'light' | 'dark' = scheme === 'light' ? 'light' : 'dark';
   const colorFromProps = props[theme];
 
   if (colorFromProps) {

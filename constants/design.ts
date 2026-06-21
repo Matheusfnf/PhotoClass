@@ -43,7 +43,43 @@ export const Palette = {
   black: '#000000',
 } as const;
 
-export const AppColors = {
+export type ThemeName =
+  | 'dark'
+  | 'light'
+  | 'dark-amoled'
+  | 'dark-midnight'
+  | 'plant-green'
+  | 'rose-pink'
+  | 'pastel-yellow';
+
+/** Forma de uma paleta — todas as chaves de tema têm exatamente estes campos. */
+export interface ThemeColors {
+  background: string;
+  surface: string;
+  surfaceElevated: string;
+  primary: string;
+  primaryMuted: string;
+  accent: string;
+  accentMuted: string;
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  border: string;
+  borderLight: string;
+  card: string;
+  cardBorder: string;
+  overlay: string;
+  tabBar: string;
+  tabBarBorder: string;
+  icon: string;
+  iconActive: string;
+  success: string;
+  warning: string;
+  error: string;
+  info: string;
+}
+
+export const AppColors: Record<ThemeName, ThemeColors> = {
   dark: {
     background: Palette.gray900,
     surface: Palette.gray850,
@@ -219,7 +255,7 @@ export const AppColors = {
     error: Palette.error,
     info: Palette.info,
   },
-} as const;
+};
 
 export const Spacing = {
   xs: 4,
