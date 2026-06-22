@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { PremiumProvider } from '@/context/PremiumContext';
 import { DatabaseProvider } from '@/context/DatabaseContext';
 import { SyncProvider } from '@/context/SyncContext';
 import { SyncGate } from '@/components/SyncGate';
@@ -72,6 +73,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
+        <PremiumProvider>
         <DatabaseProvider>
           <SyncProvider>
             <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -99,6 +101,7 @@ export default function RootLayout() {
             </ThemeProvider>
           </SyncProvider>
         </DatabaseProvider>
+        </PremiumProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

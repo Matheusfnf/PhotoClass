@@ -7,8 +7,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, FontSize, FontWeight, Spacing, BorderRadius, Palette } from '@/constants/design';
 import { LinearGradient } from 'expo-linear-gradient';
 import { purchasePremium, restorePurchases, getManagementURL } from '@/lib/revenuecat';
-import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { usePremium } from '@/context/PremiumContext';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 
 /** Fallback caso o RevenueCat não devolva a managementURL. */
@@ -24,8 +23,7 @@ export default function PaywallScreen() {
   const [restoring, setRestoring] = useState(false);
   const [packageToBuy, setPackageToBuy] = useState<any>(null);
   const [priceString, setPriceString] = useState('R$ 9,90');
-  const { user, profile, refreshProfile } = useAuth();
-  const isPremium = profile?.plan_tier === 'premium';
+  const { isPremium } = usePremium();
 
   React.useEffect(() => {
     const fetchOfferings = async () => {
@@ -43,11 +41,9 @@ export default function PaywallScreen() {
   const handleSubscribe = async () => {
     setLoading(true);
     const success = await purchasePremium(packageToBuy);
-    
-    if (success && user) {
-      // Como estamos no modo simulação, forçamos o plano no Supabase também
-      await supabase.from('profiles').update({ plan_tier: 'premium' }).eq('id', user.id);
-      await refreshProfile();
+    // O premium vale pela verdade do RevenueCat: o PremiumProvider escuta a compra,
+    // atualiza isPremium e reconcilia o plan_tier — não setamos à mão.
+    if (success) {
       Alert.alert('Sucesso!', 'Bem-vindo ao PhotoClass Pro. Aproveite seus novos recursos!');
       router.back();
     } else {
@@ -59,9 +55,7 @@ export default function PaywallScreen() {
   const handleRestore = async () => {
     setRestoring(true);
     const ok = await restorePurchases();
-    if (ok && user) {
-      await supabase.from('profiles').update({ plan_tier: 'premium' }).eq('id', user.id);
-      await refreshProfile();
+    if (ok) {
       Alert.alert('Compra restaurada', 'Bem-vindo de volta ao PhotoClass Pro! 💜');
       router.back();
     } else {

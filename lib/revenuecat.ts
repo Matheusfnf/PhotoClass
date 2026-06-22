@@ -127,3 +127,35 @@ export const getManagementURL = async (): Promise<string | null> => {
     return null;
   }
 };
+
+/** Verifica AGORA, direto no RevenueCat, se o entitlement premium está ativo. */
+export const hasActivePremium = async (): Promise<boolean> => {
+  try {
+    if (!hasKeys()) return false;
+    const info = await Purchases.getCustomerInfo();
+    return typeof info.entitlements.active[PREMIUM_ENTITLEMENT] !== "undefined";
+  } catch (e) {
+    console.log("RevenueCat: hasActivePremium falhou.", e);
+    return false;
+  }
+};
+
+/**
+ * Observa mudanças de assinatura (compra, renovação, expiração). Chama `cb(ativo)`
+ * toda vez que o RevenueCat atualiza o customerInfo. Retorna função pra remover o
+ * listener. No-op seguro se não houver chaves (Expo Go).
+ */
+export const addPremiumListener = (cb: (active: boolean) => void): (() => void) => {
+  try {
+    if (!hasKeys()) return () => {};
+    const listener = (info: any) => {
+      cb(typeof info?.entitlements?.active?.[PREMIUM_ENTITLEMENT] !== "undefined");
+    };
+    Purchases.addCustomerInfoUpdateListener(listener);
+    return () => {
+      try { Purchases.removeCustomerInfoUpdateListener(listener); } catch {}
+    };
+  } catch {
+    return () => {};
+  }
+};
