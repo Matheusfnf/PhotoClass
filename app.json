@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.matheusfnf.PhotoClass",
+      "versionCode": 9999,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
