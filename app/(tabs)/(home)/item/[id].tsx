@@ -27,6 +27,16 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { ZoomableImage } from '@/components/ui/ZoomableImage';
+import {
+  NotesSection,
+  NotebookNote,
+  RuledPaper,
+  NOTE_FONT,
+  NOTE_INK,
+  NOTE_INK_FADED,
+  NOTE_FONT_SIZE,
+  NOTE_LINE_HEIGHT,
+} from '@/components/ui/RuledPaper';
 import { captureRef } from 'react-native-view-shot';
 import { PhotoEditorCanvas } from '@/components/ui/PhotoEditorCanvas';
 import { PhotoCropCanvas, CropArea } from '@/components/ui/PhotoCropCanvas';
@@ -480,15 +490,24 @@ const renderEditModal = () => (
           />
 
           <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Anotações</Text>
-          <TextInput
-            style={[styles.textArea, { backgroundColor: colors.background, color: colors.text, borderColor: colors.borderLight }]}
-            value={editNotes}
-            onChangeText={setEditNotes}
-            placeholder="Notas da aula, observações importantes..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-            textAlignVertical="top"
-          />
+          <RuledPaper minHeight={NOTE_LINE_HEIGHT * 5 + 14} style={{ marginBottom: Spacing.xl }}>
+            <TextInput
+              style={{
+                fontFamily: NOTE_FONT,
+                fontSize: NOTE_FONT_SIZE,
+                lineHeight: NOTE_LINE_HEIGHT,
+                color: NOTE_INK,
+                padding: 0,
+                minHeight: NOTE_LINE_HEIGHT * 5,
+              }}
+              value={editNotes}
+              onChangeText={setEditNotes}
+              placeholder="Escreva suas anotações da aula aqui…"
+              placeholderTextColor={NOTE_INK_FADED}
+              multiline
+              textAlignVertical="top"
+            />
+          </RuledPaper>
         </ScrollView>
 
         <View style={[styles.modalFooter, { paddingBottom: Platform.OS === 'ios' ? 32 : Spacing.xl }]}>
@@ -699,14 +718,7 @@ return (
                               </Text>
                             )}
                           </View>
-                          {loopItem.notes ? (
-                            <View style={[styles.notesContainer, { backgroundColor: colors.background }]}>
-                              <Text style={[styles.notesTitle, { color: colors.text }]}>Anotações</Text>
-                              <Text style={[styles.notesText, { color: colors.textSecondary }]}>{loopItem.notes}</Text>
-                            </View>
-                          ) : (
-                            <Text style={{ color: colors.primary, marginTop: 16, fontSize: 15, fontWeight: '500' }}>+ Adicionar Anotações ou Título</Text>
-                          )}
+                          <NotesSection notes={loopItem.notes} />
                         </Pressable>
                       </View>
                     )}
@@ -743,16 +755,7 @@ return (
                       </View>
                     )}
                     <Pressable onPress={handleOpenEdit}>
-                      {loopItem.notes ? (
-                        <View style={[styles.notesContainer, { backgroundColor: colors.surface }]}>
-                          <Text style={[styles.notesTitle, { color: colors.text }]}>Anotações</Text>
-                          <Text style={[styles.notesText, { color: colors.textSecondary }]}>{loopItem.notes}</Text>
-                        </View>
-                      ) : (
-                        <View style={{ alignItems: 'center', marginVertical: 16 }}>
-                          <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '500' }}>+ Adicionar Anotações ou Título</Text>
-                        </View>
-                      )}
+                      <NotesSection notes={loopItem.notes} />
                     </Pressable>
                   </ScrollView>
             ) : loopItem.type === 'document' ? (
@@ -794,8 +797,7 @@ return (
                   {/* Se tiver anotações em PDF, mostra uma abinha ou embaixo */}
                   {loopItem.notes && (
                     <View style={{ padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.borderLight }}>
-                      <Text style={[styles.notesTitle, { color: colors.text }]}>Anotações</Text>
-                      <Text style={[styles.notesText, { color: colors.textSecondary }]}>{loopItem.notes}</Text>
+                      <NotebookNote text={loopItem.notes} />
                     </View>
                   )}
                 </View>
@@ -827,16 +829,7 @@ return (
                     </View>
                   </Pressable>
                   <Pressable onPress={handleOpenEdit}>
-                    {loopItem.notes ? (
-                      <View style={[styles.notesContainer, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.notesTitle, { color: colors.text }]}>Anotações</Text>
-                        <Text style={[styles.notesText, { color: colors.textSecondary }]}>{loopItem.notes}</Text>
-                      </View>
-                    ) : (
-                      <View style={{ alignItems: 'center', marginVertical: 16 }}>
-                        <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '500' }}>+ Adicionar Anotações ou Título</Text>
-                      </View>
-                    )}
+                    <NotesSection notes={loopItem.notes} />
                   </Pressable>
                   <Pressable
                     onPress={handleShare}

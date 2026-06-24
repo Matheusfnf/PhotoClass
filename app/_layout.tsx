@@ -13,6 +13,7 @@ import { SyncProvider } from '@/context/SyncContext';
 import { SyncGate } from '@/components/SyncGate';
 import { AppColors } from '@/constants/design';
 import { initRevenueCat, loginRevenueCat, logoutRevenueCat } from '@/lib/revenuecat';
+import { useFonts, Caveat_400Regular } from '@expo-google-fonts/caveat';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -64,6 +65,10 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const scheme = colorScheme ?? 'dark';
   const colors = AppColors[scheme];
+
+  // Carrega a fonte manuscrita (Caveat) para as anotações com cara de caderno.
+  // Não bloqueia a renderização: o texto troca para a manuscrita quando carregar.
+  useFonts({ Caveat_400Regular });
 
   // Configura o RevenueCat uma vez no startup (no-op seguro no Expo Go).
   useEffect(() => {
