@@ -1,6 +1,7 @@
 import { useColorScheme as useRNColorScheme } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
-import { AppColors } from '@/constants/design';
+import { usePremium } from '@/context/PremiumContext';
+import { AppColors, isPremiumTheme } from '@/constants/design';
 
 export type AppTheme = keyof typeof AppColors;
 
@@ -20,10 +21,19 @@ export type AppTheme = keyof typeof AppColors;
 export function useColorScheme(): AppTheme {
   const system = useRNColorScheme();
   const { profile } = useAuth();
+  const { isPremium } = usePremium();
   const theme = profile?.theme;
+  const systemFallback: AppTheme = system === 'light' ? 'light' : 'dark';
 
   if (theme && theme !== 'default' && theme in AppColors) {
+    // Temas premium só valem com assinatura ATIVA. Se a assinatura expirou (ou
+    // nunca existiu), ignoramos o tema premium salvo no perfil e caímos no tema
+    // do sistema — assim o benefício some na hora, mesmo antes do PremiumContext
+    // reconciliar o profile.theme no banco.
+    if (isPremiumTheme(theme) && !isPremium) {
+      return systemFallback;
+    }
     return theme as AppTheme;
   }
-  return system === 'light' ? 'light' : 'dark';
+  return systemFallback;
 }

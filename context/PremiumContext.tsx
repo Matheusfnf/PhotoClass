@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { useAuth } from './AuthContext';
 import { supabase } from '@/lib/supabase';
 import { hasActivePremium, addPremiumListener } from '@/lib/revenuecat';
+import { PREMIUM_THEMES } from '@/constants/design';
 
 interface PremiumValue {
   /** Verdade do RevenueCat: a assinatura está ativa AGORA. */
@@ -43,6 +44,17 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
       lastReconciled.current = active;
       try {
         await supabase.from('profiles').update({ plan_tier: active ? 'premium' : 'free' }).eq('id', uid);
+        // Ao perder o premium, reverte também os benefícios persistidos: se o tema
+        // salvo é premium, volta pro 'default'. O .in() garante que NÃO mexemos no
+        // tema de quem escolheu um gratuito ('light'/'dark'). O gate em
+        // use-color-scheme já esconde o tema na hora; isto limpa o estado no banco.
+        if (!active) {
+          await supabase
+            .from('profiles')
+            .update({ theme: 'default' })
+            .eq('id', uid)
+            .in('theme', PREMIUM_THEMES as unknown as string[]);
+        }
         await refreshProfile();
       } catch (e) {
         console.log('[Premium] reconciliação do plan_tier falhou:', e);

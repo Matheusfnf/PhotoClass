@@ -20,8 +20,9 @@ export async function getAllSpaces(): Promise<Space[]> {
       COUNT(DISTINCT f.id) as folder_count,
       COUNT(DISTINCT i.id) as item_count
     FROM spaces s
-    LEFT JOIN folders f ON f.space_id = s.id
-    LEFT JOIN items i ON i.folder_id = f.id
+    LEFT JOIN folders f ON f.space_id = s.id AND f.deleted_at IS NULL
+    LEFT JOIN items i ON i.folder_id = f.id AND i.deleted_at IS NULL
+    WHERE s.deleted_at IS NULL
     GROUP BY s.id
     ORDER BY s.updated_at DESC
   `);
@@ -35,9 +36,9 @@ export async function getSpace(id: string): Promise<Space | null> {
        COUNT(DISTINCT f.id) as folder_count,
        COUNT(DISTINCT i.id) as item_count
      FROM spaces s
-     LEFT JOIN folders f ON f.space_id = s.id
-     LEFT JOIN items i ON i.folder_id = f.id
-     WHERE s.id = ?
+     LEFT JOIN folders f ON f.space_id = s.id AND f.deleted_at IS NULL
+     LEFT JOIN items i ON i.folder_id = f.id AND i.deleted_at IS NULL
+     WHERE s.id = ? AND s.deleted_at IS NULL
      GROUP BY s.id`,
     [id]
   );
@@ -77,6 +78,22 @@ export async function updateSpace(
 
 export async function deleteSpace(id: string): Promise<void> {
   const db = await getDatabase();
-  // ON DELETE CASCADE handles folders and items
-  await db.runAsync(`DELETE FROM spaces WHERE id = ?`, [id]);
+  const now = new Date().toISOString();
+
+  // Soft-delete em cascata: marca deleted_at no espaço e em TODAS as pastas e itens
+  // dentro dele. Necessário pro sync propagar a remoção (tombstones) e pra evitar
+  // pastas/itens órfãos "vivos" que voltariam num restore.
+  await db.runAsync(
+    `UPDATE items SET deleted_at = ?, updated_at = ?
+     WHERE folder_id IN (SELECT id FROM folders WHERE space_id = ?) AND deleted_at IS NULL`,
+    [now, now, id]
+  );
+  await db.runAsync(
+    `UPDATE folders SET deleted_at = ?, updated_at = ? WHERE space_id = ? AND deleted_at IS NULL`,
+    [now, now, id]
+  );
+  await db.runAsync(
+    `UPDATE spaces SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+    [now, now, id]
+  );
 }

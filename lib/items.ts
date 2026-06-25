@@ -26,7 +26,7 @@ export interface Item {
 export async function getItems(folderId: string): Promise<Item[]> {
   const db = await getDatabase();
   return db.getAllAsync<Item>(
-    `SELECT * FROM items WHERE folder_id = ? ORDER BY created_at DESC`,
+    `SELECT * FROM items WHERE folder_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`,
     [folderId]
   );
 }
@@ -34,14 +34,14 @@ export async function getItems(folderId: string): Promise<Item[]> {
 export async function getPhotosByFolder(folderId: string): Promise<Item[]> {
   const db = await getDatabase();
   return db.getAllAsync<Item>(
-    `SELECT * FROM items WHERE folder_id = ? AND type = 'photo' ORDER BY created_at DESC`,
+    `SELECT * FROM items WHERE folder_id = ? AND type = 'photo' AND deleted_at IS NULL ORDER BY created_at DESC`,
     [folderId]
   );
 }
 
 export async function getItem(id: string): Promise<Item | null> {
   const db = await getDatabase();
-  return db.getFirstAsync<Item>(`SELECT * FROM items WHERE id = ?`, [id]);
+  return db.getFirstAsync<Item>(`SELECT * FROM items WHERE id = ? AND deleted_at IS NULL`, [id]);
 }
 
 export async function createItem(data: {
@@ -115,5 +115,9 @@ export async function updateItem(
 
 export async function deleteItem(id: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync(`DELETE FROM items WHERE id = ?`, [id]);
+  const now = new Date().toISOString();
+  // Soft-delete: marca deleted_at em vez de apagar a linha. O sync precisa do
+  // "tombstone" para propagar a remoção pra nuvem e pros outros aparelhos — um
+  // DELETE local sumiria sem rastro e o item voltaria no próximo restore.
+  await db.runAsync(`UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?`, [now, now, id]);
 }

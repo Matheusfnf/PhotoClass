@@ -52,6 +52,24 @@ export type ThemeName =
   | 'rose-pink'
   | 'pastel-yellow';
 
+/**
+ * Temas que EXIGEM assinatura premium ativa. Os gratuitos são apenas
+ * 'default' (segue o sistema), 'light' e 'dark'. Fonte única da verdade:
+ * usado tanto pra travar a seleção quanto pra reverter o tema quando a
+ * assinatura expira (ver use-color-scheme e PremiumContext).
+ */
+export const PREMIUM_THEMES = [
+  'dark-amoled',
+  'dark-midnight',
+  'plant-green',
+  'rose-pink',
+  'pastel-yellow',
+] as const;
+
+export function isPremiumTheme(theme: string | null | undefined): boolean {
+  return !!theme && (PREMIUM_THEMES as readonly string[]).includes(theme);
+}
+
 /** Forma de uma paleta — todas as chaves de tema têm exatamente estes campos. */
 export interface ThemeColors {
   background: string;

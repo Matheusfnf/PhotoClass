@@ -1,4 +1,5 @@
 import * as FS from 'expo-file-system/legacy';
+import { File } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { getDatabase } from './database';
@@ -33,17 +34,10 @@ export async function uploadFile(
   storagePath: string,
   mimeType: string
 ): Promise<string> {
-  // Lê o arquivo como base64
-  const base64 = await FS.readAsStringAsync(localUri, {
-    encoding: FS.EncodingType.Base64,
-  });
-
-  // Converte base64 para Uint8Array (necessário para o SDK do Supabase)
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  // Lê o arquivo direto como bytes (binário) via a API nova do expo-file-system.
+  // Antes líamos como base64 e convertíamos byte a byte com atob() — isso inflava
+  // o conteúdo ~33% e mantinha 2+ cópias em memória, pesado pra fotos grandes.
+  const bytes = await new File(localUri).bytes();
 
   const { error } = await supabase.storage
     .from(STORAGE_BUCKET)
@@ -116,12 +110,12 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
     }
   }
 
-  // Soft-deletes de spaces
+  // Soft-deletes de spaces (tombstones): envia deleted_at pra nuvem propagar a remoção.
   const deletedSpaces = await db.getAllAsync<any>(
     `SELECT * FROM spaces WHERE deleted_at IS NOT NULL AND (synced_at IS NULL OR deleted_at > synced_at)`
   );
   if (deletedSpaces.length > 0) {
-    await supabase.from('spaces').upsert(
+    const { error } = await supabase.from('spaces').upsert(
       deletedSpaces.map((s) => ({
         id: s.id,
         user_id: userId,
@@ -134,6 +128,12 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
       })),
       { onConflict: 'id' }
     );
+    if (!error) {
+      const now = new Date().toISOString();
+      for (const s of deletedSpaces) {
+        await db.runAsync(`UPDATE spaces SET synced_at = ? WHERE id = ?`, [now, s.id]);
+      }
+    }
   }
 
   // ── Folders ──
@@ -157,6 +157,32 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
     if (!error) {
       const now = new Date().toISOString();
       for (const f of folders) {
+        await db.runAsync(`UPDATE folders SET synced_at = ? WHERE id = ?`, [now, f.id]);
+      }
+    }
+  }
+
+  // Soft-deletes de folders (tombstones).
+  const deletedFolders = await db.getAllAsync<any>(
+    `SELECT * FROM folders WHERE deleted_at IS NOT NULL AND (synced_at IS NULL OR deleted_at > synced_at)`
+  );
+  if (deletedFolders.length > 0) {
+    const { error } = await supabase.from('folders').upsert(
+      deletedFolders.map((f) => ({
+        id: f.id,
+        user_id: userId,
+        space_id: f.space_id,
+        parent_id: f.parent_id ?? null,
+        name: f.name,
+        created_at: f.created_at,
+        updated_at: f.updated_at,
+        deleted_at: f.deleted_at,
+      })),
+      { onConflict: 'id' }
+    );
+    if (!error) {
+      const now = new Date().toISOString();
+      for (const f of deletedFolders) {
         await db.runAsync(`UPDATE folders SET synced_at = ? WHERE id = ?`, [now, f.id]);
       }
     }
@@ -233,6 +259,58 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
       await db.runAsync(`UPDATE items SET synced_at = ? WHERE id = ?`, [now, item.id]);
     } catch (err) {
       console.warn(`[Sync] Failed to push item ${item.id}:`, err);
+    }
+  }
+
+  // Soft-deletes de items (tombstones). Além de marcar deleted_at na nuvem (pra
+  // propagar a remoção), apagamos os arquivos do Storage e do dispositivo — nenhum
+  // aparelho precisa mais deles, e assim não viram lixo consumindo cota.
+  const deletedItems = await db.getAllAsync<any>(
+    `SELECT * FROM items WHERE deleted_at IS NOT NULL AND (synced_at IS NULL OR deleted_at > synced_at)`
+  );
+  for (const item of deletedItems) {
+    try {
+      const { error } = await supabase.from('items').upsert(
+        {
+          id: item.id,
+          user_id: userId,
+          folder_id: item.folder_id,
+          type: item.type,
+          title: item.title ?? null,
+          storage_key: item.storage_key ?? null,
+          thumbnail_key: item.thumb_key ?? null,
+          duration: item.duration ?? null,
+          mime_type: item.mime_type ?? null,
+          file_size: item.file_size ?? null,
+          notes: item.notes ?? null,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          deleted_at: item.deleted_at,
+        },
+        { onConflict: 'id' }
+      );
+      if (error) continue; // tenta de novo no próximo sync
+
+      // Remove os arquivos do bucket (best-effort).
+      const remoteKeys = [item.storage_key, item.thumb_key].filter(Boolean);
+      if (remoteKeys.length > 0) {
+        await supabase.storage.from(STORAGE_BUCKET).remove(remoteKeys);
+      }
+
+      // Remove os arquivos locais pra liberar espaço no dispositivo (best-effort).
+      for (const uri of [item.file_uri, item.thumbnail]) {
+        if (uri && uri !== '') {
+          try {
+            const info = await FS.getInfoAsync(uri);
+            if (info.exists) await FS.deleteAsync(uri, { idempotent: true });
+          } catch { /* ignora falha ao apagar arquivo local */ }
+        }
+      }
+
+      const now = new Date().toISOString();
+      await db.runAsync(`UPDATE items SET synced_at = ? WHERE id = ?`, [now, item.id]);
+    } catch (err) {
+      console.warn(`[Sync] Failed to push deleted item ${item.id}:`, err);
     }
   }
 }

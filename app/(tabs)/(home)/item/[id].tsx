@@ -21,6 +21,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { getItem, updateItem, getItems, type Item } from '@/lib/items';
 import { formatFileSize } from '@/lib/files';
+import { checkStorageLimit, textBytes } from '@/lib/storage-stats';
+import { useAuth } from '@/context/AuthContext';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { WebView } from 'react-native-webview';
 import * as Sharing from 'expo-sharing';
@@ -49,6 +51,7 @@ export default function ItemDetailScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const router = useRouter();
+  const { profile } = useAuth();
 
   const [item, setItem] = useState<Item | null>(null);
   // Swipe gallery state
@@ -137,6 +140,20 @@ export default function ItemDetailScreen() {
         title: editTitle.trim() || undefined,
         notes: editNotes.trim() || undefined,
       };
+
+      // Trava de cota também pro TEXTO: o item já está contado com o texto antigo,
+      // então checamos só o que o texto CRESCEU (delta). Se diminuiu, libera direto.
+      const oldBytes = textBytes(currentItem.title) + textBytes(currentItem.notes);
+      const newBytes = textBytes(updatedData.title) + textBytes(updatedData.notes);
+      const delta = newBytes - oldBytes;
+      if (delta > 0) {
+        const { allowed } = await checkStorageLimit(delta, profile?.plan_tier);
+        if (!allowed) {
+          Alert.alert('Limite Excedido', 'Este texto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade.');
+          return;
+        }
+      }
+
       await updateItem(currentItem.id, updatedData);
 
       const updatedItem = {
