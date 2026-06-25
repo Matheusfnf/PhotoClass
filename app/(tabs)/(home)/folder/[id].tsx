@@ -117,19 +117,9 @@ export default function FolderDetailScreen() {
 
   const handlePickPhoto = async () => {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          'Permissão de Galeria',
-          'O PhotoClass precisa de acesso à galeria para que você possa escolher fotos. Deseja habilitar nas configurações?',
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Abrir Configurações', onPress: () => Linking.openSettings() }
-          ]
-        );
-        return;
-      }
-
+      // Seletor de Fotos do Android (Photo Picker): acesso pontual a fotos, SEM a permissão
+      // READ_MEDIA_* (proibida para uso pontual pela política do Google). No expo-image-picker
+      // 17 o launchImageLibraryAsync já usa o Photo Picker do sistema, sem pedir permissão.
       const result = await ImagePicker.launchImageLibraryAsync({
         quality: 0.8,
         allowsMultipleSelection: true,
