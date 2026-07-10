@@ -21,6 +21,7 @@ export default function HomeLayout() {
       <Stack.Screen name="space/[id]" options={{ title: '', headerBackTitle: 'Espaços' }} />
       <Stack.Screen name="folder/[id]" options={{ title: '', headerBackTitle: 'Voltar' }} />
       <Stack.Screen name="item/[id]" options={{ title: '', headerTransparent: true, headerBackTitle: 'Voltar' }} />
+      <Stack.Screen name="note/[id]" options={{ title: 'Anotações', headerBackTitle: 'Voltar' }} />
     </Stack>
   );
 }

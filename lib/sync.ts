@@ -243,6 +243,7 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
           id: item.id,
           user_id: userId,
           folder_id: item.folder_id,
+          parent_id: item.parent_id ?? null,
           type: item.type,
           title: item.title ?? null,
           storage_key: storageKey ?? null,
@@ -280,6 +281,7 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
           id: item.id,
           user_id: userId,
           folder_id: item.folder_id,
+          parent_id: item.parent_id ?? null,
           type: item.type,
           title: item.title ?? null,
           storage_key: item.storage_key ?? null,
@@ -443,19 +445,20 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
     // re-baixado acima (premium) ficava órfão porque o novo caminho só era
     // gravado no INSERT.
     await db.runAsync(
-      `INSERT INTO items (id, folder_id, type, title, file_uri, thumbnail, duration, mime_type, file_size, notes, created_at, updated_at, storage_key, synced_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO items (id, folder_id, parent_id, type, title, file_uri, thumbnail, duration, mime_type, file_size, notes, created_at, updated_at, storage_key, synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          title       = excluded.title,
          notes       = excluded.notes,
          folder_id   = excluded.folder_id,
+         parent_id   = excluded.parent_id,
          file_uri    = excluded.file_uri,
          updated_at  = excluded.updated_at,
          storage_key = excluded.storage_key,
          synced_at   = excluded.synced_at
        WHERE excluded.updated_at > items.updated_at`,
       [
-        ri.id, ri.folder_id, ri.type, ri.title ?? null,
+        ri.id, ri.folder_id, ri.parent_id ?? null, ri.type, ri.title ?? null,
         localUri, localUri,
         ri.duration ?? null, ri.mime_type ?? null, ri.file_size ?? null,
         ri.notes ?? null, ri.created_at, ri.updated_at,

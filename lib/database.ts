@@ -305,4 +305,47 @@ async function runMigrations(db: SQLite.SQLiteDatabase) {
 
     await db.execAsync(`INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (3, datetime('now'));`);
   }
+
+  // ── v4: anotações independentes (type 'note') + áudio anexado (parent_id) ──
+  // SQLite não permite alterar o CHECK de type, então é rebuild da tabela.
+  // parent_id NÃO tem FK de propósito: no pull o filho pode chegar antes do pai
+  // (a ordem vem do updated_at remoto) e uma FK rejeitaria a linha.
+  if (currentVersion < 4) {
+    await db.execAsync(`PRAGMA foreign_keys = OFF;`);
+    await db.execAsync(`
+      BEGIN TRANSACTION;
+      CREATE TABLE IF NOT EXISTS items_v4 (
+        id          TEXT PRIMARY KEY,
+        folder_id   TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+        parent_id   TEXT,
+        type        TEXT NOT NULL CHECK(type IN ('photo','audio','document','note')),
+        title       TEXT,
+        file_uri    TEXT NOT NULL DEFAULT '',
+        thumbnail   TEXT,
+        duration    INTEGER,
+        mime_type   TEXT,
+        file_size   INTEGER,
+        notes       TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        synced_at   TEXT,
+        deleted_at  TEXT,
+        storage_key TEXT,
+        thumb_key   TEXT
+      );
+      INSERT OR IGNORE INTO items_v4
+        (id, folder_id, type, title, file_uri, thumbnail, duration, mime_type,
+         file_size, notes, created_at, updated_at, synced_at, deleted_at, storage_key, thumb_key)
+        SELECT id, folder_id, type, title, file_uri, thumbnail, duration, mime_type,
+               file_size, notes, created_at, updated_at, synced_at, deleted_at, storage_key, thumb_key
+        FROM items;
+      DROP TABLE items;
+      ALTER TABLE items_v4 RENAME TO items;
+      CREATE INDEX IF NOT EXISTS idx_items_folder ON items(folder_id);
+      CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent_id);
+      INSERT OR IGNORE INTO _migrations (version, applied_at) VALUES (4, datetime('now'));
+      COMMIT;
+    `);
+    await db.execAsync(`PRAGMA foreign_keys = ON;`);
+  }
 }

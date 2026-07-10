@@ -23,7 +23,7 @@ export async function getFolders(spaceId: string, parentId: string | null = null
       COUNT(i.id) as item_count,
       (SELECT ii.thumbnail FROM items ii WHERE ii.folder_id = f.id AND ii.type = 'photo' AND ii.deleted_at IS NULL ORDER BY ii.created_at DESC LIMIT 1) as thumbnail
     FROM folders f
-    LEFT JOIN items i ON i.folder_id = f.id AND i.deleted_at IS NULL
+    LEFT JOIN items i ON i.folder_id = f.id AND i.parent_id IS NULL AND i.deleted_at IS NULL
     WHERE f.space_id = ? AND f.deleted_at IS NULL AND ${condition}
     GROUP BY f.id
     ORDER BY f.updated_at DESC
@@ -40,7 +40,7 @@ export async function getFolder(id: string): Promise<Folder | null> {
   return db.getFirstAsync<Folder>(
     `SELECT f.*, COUNT(i.id) as item_count
      FROM folders f
-     LEFT JOIN items i ON i.folder_id = f.id AND i.deleted_at IS NULL
+     LEFT JOIN items i ON i.folder_id = f.id AND i.parent_id IS NULL AND i.deleted_at IS NULL
      WHERE f.id = ? AND f.deleted_at IS NULL
      GROUP BY f.id`,
     [id]

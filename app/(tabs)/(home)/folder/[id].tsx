@@ -233,7 +233,8 @@ export default function FolderDetailScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteFile(item.file_uri);
+            // Anotações não têm arquivo (file_uri vazio) — nada a apagar do disco.
+            if (item.file_uri) await deleteFile(item.file_uri);
             if (item.thumbnail && item.thumbnail !== item.file_uri) {
               await deleteFile(item.thumbnail);
             }
@@ -330,6 +331,23 @@ export default function FolderDetailScreen() {
       onPress: () => router.push(`/folder/new?space_id=${folder?.space_id}&parent_id=${folder?.id}`),
     },
     {
+      icon: 'reader',
+      label: 'Nova Anotação',
+      color: '#A29BFE',
+      onPress: async () => {
+        const { allowed } = await checkStorageLimit(0, profile?.plan_tier);
+        if (!allowed) return Alert.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
+        try {
+          // Cria a anotação vazia e abre direto o editor — o autosave cuida do resto.
+          const note = await createItem({ folder_id: id!, type: 'note' });
+          router.push(`/note/${note.id}`);
+        } catch (e) {
+          console.error('Failed to create note:', e);
+          Alert.alert('Erro', 'Não foi possível criar a anotação.');
+        }
+      },
+    },
+    {
       icon: 'camera',
       label: 'Tirar Foto',
       color: '#6C5CE7',
@@ -388,6 +406,43 @@ export default function FolderDetailScreen() {
             contentFit="cover"
             transition={200}
           />
+          <Pressable
+            onPress={() => handleItemAction(item)}
+            hitSlop={8}
+            style={({ pressed }) => [styles.tileMenuOverlay, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="ellipsis-horizontal" size={14} color="#FFF" />
+          </Pressable>
+        </Pressable>
+      );
+    }
+
+    if (item.type === 'note') {
+      return (
+        <Pressable
+          onPress={() => router.push(`/note/${item.id}`)}
+          onLongPress={() => handleItemAction(item)}
+          style={({ pressed }) => [
+            styles.mediaTile,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.borderLight,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="reader" size={24} color="#A29BFE" />
+          <Text style={[styles.mediaTitle, { color: colors.text }]} numberOfLines={1}>
+            {item.title || 'Anotação'}
+          </Text>
+          {!!item.notes && (
+            <Text style={[styles.mediaMeta, { color: colors.textMuted }]} numberOfLines={2}>
+              {item.notes}
+            </Text>
+          )}
+          <Pressable onPress={() => handleItemAction(item)} hitSlop={8} style={styles.tileMenu}>
+            <Ionicons name="ellipsis-vertical" size={14} color={colors.textMuted} />
+          </Pressable>
         </Pressable>
       );
     }
@@ -415,6 +470,9 @@ export default function FolderDetailScreen() {
               {Math.floor(item.duration / 60)}:{String(item.duration % 60).padStart(2, '0')}
             </Text>
           )}
+          <Pressable onPress={() => handleItemAction(item)} hitSlop={8} style={styles.tileMenu}>
+            <Ionicons name="ellipsis-vertical" size={14} color={colors.textMuted} />
+          </Pressable>
         </Pressable>
       );
     }
@@ -442,6 +500,9 @@ export default function FolderDetailScreen() {
             {formatFileSize(item.file_size)}
           </Text>
         )}
+        <Pressable onPress={() => handleItemAction(item)} hitSlop={8} style={styles.tileMenu}>
+          <Ionicons name="ellipsis-vertical" size={14} color={colors.textMuted} />
+        </Pressable>
       </Pressable>
     );
   };
@@ -514,7 +575,13 @@ export default function FolderDetailScreen() {
                       {sf.item_count ?? 0} {sf.item_count === 1 ? 'item' : 'itens'}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  <Pressable
+                    onPress={() => handleDeleteFolder(sf)}
+                    hitSlop={10}
+                    style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
+                  </Pressable>
               </Pressable>
             ))}
           </View>
@@ -641,6 +708,25 @@ const styles = StyleSheet.create({
   },
   mediaMeta: {
     fontSize: 10,
+  },
+  // Menu ⋯ dos tiles: em foto precisa de fundo escuro pra contrastar com a
+  // imagem; nos tiles de superfície basta o ícone discreto no canto.
+  tileMenuOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileMenu: {
+    position: 'absolute',
+    top: 4,
+    right: 2,
+    padding: 4,
   },
   breadcrumbs: {
     paddingHorizontal: Spacing.xl,

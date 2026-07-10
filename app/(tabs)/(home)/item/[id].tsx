@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import PagerView from 'react-native-pager-view';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
+import { useLocalSearchParams, Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
@@ -29,16 +29,6 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { ZoomableImage } from '@/components/ui/ZoomableImage';
-import {
-  NotesSection,
-  NotebookNote,
-  RuledPaper,
-  NOTE_FONT,
-  NOTE_INK,
-  NOTE_INK_FADED,
-  NOTE_FONT_SIZE,
-  NOTE_LINE_HEIGHT,
-} from '@/components/ui/RuledPaper';
 import { captureRef } from 'react-native-view-shot';
 import { PhotoEditorCanvas } from '@/components/ui/PhotoEditorCanvas';
 import { PhotoCropCanvas, CropArea } from '@/components/ui/PhotoCropCanvas';
@@ -66,7 +56,6 @@ export default function ItemDetailScreen() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [editNotes, setEditNotes] = useState('');
 
   // Drawing & Crop states
   const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -82,6 +71,27 @@ export default function ItemDetailScreen() {
 
   const currentItem = folderItems[currentIndex] || item;
 
+  // Id do item visível, em ref, pro refresh de foco não depender de state (evita loop).
+  const currentIdRef = useRef<string | null>(null);
+  useEffect(() => { currentIdRef.current = currentItem?.id ?? null; }, [currentItem?.id]);
+
+  // Ao voltar pra esta tela (ex.: depois de editar em /note/[id]), recarrega os
+  // itens pra o card de anotações refletir o texto novo.
+  useFocusEffect(
+    useCallback(() => {
+      const folderId = item?.folder_id;
+      if (!folderId) return;
+      getItems(folderId)
+        .then((all) => {
+          const media = all.filter((i) => i.type !== 'note');
+          setFolderItems(media);
+          const cur = media.find((i) => i.id === currentIdRef.current);
+          if (cur) setItem(cur);
+        })
+        .catch(() => {});
+    }, [item?.folder_id])
+  );
+
   const colorsPalette = ['#FF3B30', '#34C759', '#007AFF', '#FFCC00', '#FFFFFF', '#000000'];
 
   useEffect(() => {
@@ -89,7 +99,8 @@ export default function ItemDetailScreen() {
       getItem(id).then(async (loadedItem) => {
         setItem(loadedItem);
         if (loadedItem?.folder_id) {
-          const items = await getItems(loadedItem.folder_id);
+          // Anotações independentes têm tela própria (/note/[id]) — ficam fora do pager.
+          const items = (await getItems(loadedItem.folder_id)).filter((i) => i.type !== 'note');
           setFolderItems(items);
           const idx = items.findIndex(p => p.id === id);
           setCurrentIndex(idx >= 0 ? idx : 0);
@@ -129,23 +140,20 @@ export default function ItemDetailScreen() {
   const handleOpenEdit = () => {
     if (!currentItem) return;
     setEditTitle(currentItem.title ?? '');
-    setEditNotes(currentItem.notes ?? '');
     setIsEditing(true);
   };
 
   const handleSaveEdit = async () => {
     if (!currentItem) return;
     try {
+      // As anotações agora vivem na tela dedicada (/note/[id]) — aqui só o título.
       const updatedData = {
         title: editTitle.trim() || undefined,
-        notes: editNotes.trim() || undefined,
       };
 
       // Trava de cota também pro TEXTO: o item já está contado com o texto antigo,
       // então checamos só o que o texto CRESCEU (delta). Se diminuiu, libera direto.
-      const oldBytes = textBytes(currentItem.title) + textBytes(currentItem.notes);
-      const newBytes = textBytes(updatedData.title) + textBytes(updatedData.notes);
-      const delta = newBytes - oldBytes;
+      const delta = textBytes(updatedData.title) - textBytes(currentItem.title);
       if (delta > 0) {
         const { allowed } = await checkStorageLimit(delta, profile?.plan_tier);
         if (!allowed) {
@@ -159,7 +167,6 @@ export default function ItemDetailScreen() {
       const updatedItem = {
         ...currentItem,
         title: updatedData.title ?? null,
-        notes: updatedData.notes ?? null
       };
       setFolderItems(prev => prev.map(p => p.id === currentItem.id ? updatedItem : p));
       if (item && currentItem.id === item.id) setItem(updatedItem);
@@ -330,6 +337,33 @@ const handleDownloadItem = async (targetItem: Item) => {
   }
 };
 
+// Card de anotações: preview do texto + atalho pra tela dedicada (/note/[id]),
+// onde também dá pra gravar áudios anexados ao item.
+const renderNotesCard = (target: Item) => (
+  <Pressable
+    onPress={() => router.push(`/note/${target.id}`)}
+    style={({ pressed }) => [
+      styles.notesCard,
+      { backgroundColor: colors.surface, borderColor: colors.borderLight, opacity: pressed ? 0.85 : 1 },
+    ]}
+  >
+    <View style={styles.notesCardHeader}>
+      <Ionicons name="reader-outline" size={16} color={colors.primary} />
+      <Text style={[styles.notesCardTitle, { color: colors.textSecondary }]}>Minhas anotações</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginLeft: 'auto' }} />
+    </View>
+    {target.notes ? (
+      <Text style={[styles.notesCardText, { color: colors.text }]} numberOfLines={4}>
+        {target.notes}
+      </Text>
+    ) : (
+      <Text style={[styles.notesCardText, { color: colors.textMuted, fontStyle: 'italic' }]}>
+        Toque para escrever anotações ou gravar áudios…
+      </Text>
+    )}
+  </Pressable>
+);
+
 const renderActionBar = () => {
   const isPhoto = currentItem?.type === 'photo';
   return (
@@ -385,6 +419,13 @@ const renderActionBar = () => {
               </Pressable>
             </>
           )}
+          <Pressable
+            onPress={() => currentItem && router.push(`/note/${currentItem.id}`)}
+            style={styles.actionBtn}
+          >
+            <Ionicons name="reader-outline" size={20} color={colors.textSecondary} />
+            <Text style={[styles.actionBtnText, { color: colors.textSecondary }]}>Anotações</Text>
+          </Pressable>
           <Pressable onPress={handleShare} style={styles.actionBtn}>
             <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
             <Text style={[styles.actionBtnText, { color: colors.textSecondary }]}>Compartilhar</Text>
@@ -506,25 +547,6 @@ const renderEditModal = () => (
             placeholderTextColor={colors.textMuted}
           />
 
-          <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Anotações</Text>
-          <RuledPaper minHeight={NOTE_LINE_HEIGHT * 5 + 14} style={{ marginBottom: Spacing.xl }}>
-            <TextInput
-              style={{
-                fontFamily: NOTE_FONT,
-                fontSize: NOTE_FONT_SIZE,
-                lineHeight: NOTE_LINE_HEIGHT,
-                color: NOTE_INK,
-                padding: 0,
-                minHeight: NOTE_LINE_HEIGHT * 5,
-              }}
-              value={editNotes}
-              onChangeText={setEditNotes}
-              placeholder="Escreva suas anotações da aula aqui…"
-              placeholderTextColor={NOTE_INK_FADED}
-              multiline
-              textAlignVertical="top"
-            />
-          </RuledPaper>
         </ScrollView>
 
         <View style={[styles.modalFooter, { paddingBottom: Platform.OS === 'ios' ? 32 : Spacing.xl }]}>
@@ -735,8 +757,8 @@ return (
                               </Text>
                             )}
                           </View>
-                          <NotesSection notes={loopItem.notes} />
                         </Pressable>
+                        {renderNotesCard(loopItem)}
                       </View>
                     )}
                   </ScrollView>
@@ -771,9 +793,7 @@ return (
                         />
                       </View>
                     )}
-                    <Pressable onPress={handleOpenEdit}>
-                      <NotesSection notes={loopItem.notes} />
-                    </Pressable>
+                    {renderNotesCard(loopItem)}
                   </ScrollView>
             ) : loopItem.type === 'document' ? (
             <View style={{ flex: 1, width: '100%' }}>
@@ -811,12 +831,9 @@ return (
                       </Pressable>
                     </ScrollView>
                   )}
-                  {/* Se tiver anotações em PDF, mostra uma abinha ou embaixo */}
-                  {loopItem.notes && (
-                    <View style={{ padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.borderLight }}>
-                      <NotebookNote text={loopItem.notes} />
-                    </View>
-                  )}
+                  <View style={{ padding: 16 }}>
+                    {renderNotesCard(loopItem)}
+                  </View>
                 </View>
               ) : (
                 <ScrollView contentContainerStyle={styles.detailContent}>
@@ -845,9 +862,7 @@ return (
                       )}
                     </View>
                   </Pressable>
-                  <Pressable onPress={handleOpenEdit}>
-                    <NotesSection notes={loopItem.notes} />
-                  </Pressable>
+                  {renderNotesCard(loopItem)}
                   <Pressable
                     onPress={handleShare}
                     style={({ pressed }) => [
@@ -1183,6 +1198,27 @@ const styles = StyleSheet.create({
   },
   detailMetaText: {
     fontSize: FontSize.sm,
+  },
+  notesCard: {
+    width: '100%',
+    marginTop: Spacing['2xl'],
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  notesCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  notesCardTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+  },
+  notesCardText: {
+    fontSize: FontSize.md,
+    lineHeight: 22,
   },
   notesContainer: {
     width: '100%',
