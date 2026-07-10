@@ -13,7 +13,11 @@ import { SyncProvider } from '@/context/SyncContext';
 import { SyncGate } from '@/components/SyncGate';
 import { AppColors } from '@/constants/design';
 import { initRevenueCat, loginRevenueCat, logoutRevenueCat } from '@/lib/revenuecat';
+import { initSentry, Sentry } from '@/lib/sentry';
 import { useFonts, Caveat_400Regular } from '@expo-google-fonts/caveat';
+
+// O mais cedo possível (antes do primeiro render) pra capturar crashes de startup.
+initSentry();
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -61,7 +65,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
   const scheme = colorScheme ?? 'dark';
   const colors = AppColors[scheme];
@@ -111,3 +115,6 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// Sentry.wrap captura erros JS não tratados que derrubariam a árvore React.
+export default Sentry.wrap(RootLayout);

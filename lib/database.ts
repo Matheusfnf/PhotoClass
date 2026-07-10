@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { captureError } from './sentry';
 
 // ─── Cache de conexões por usuário ────────────────────────────────────────────
 // NUNCA fechamos uma conexão durante a sessão. Fechar/reabrir a conexão do
@@ -79,6 +80,9 @@ async function openConnection(userId: string): Promise<SQLite.SQLiteDatabase> {
       try { await raw?.closeAsync(); } catch { /* já morto, ignora */ }
     }
   }
+  // 6 tentativas e nenhum handle vivo — o workaround do expo-sqlite não deu conta.
+  // Reportamos só a FALHA da cura (curas bem-sucedidas são esperadas e seriam ruído).
+  captureError(lastErr, 'database', { phase: 'openConnection', attempts: 6 });
   throw lastErr;
 }
 
@@ -123,6 +127,11 @@ async function execWithHeal(method: DbMethod, args: any[], retried = false): Pro
       // concorrentes que bateram no mesmo handle.
       if (_connections.get(uid) === conn) _connections.delete(uid);
       return execWithHeal(method, args, true);
+    }
+    // Auto-cura falhou (segundo NPE seguido) — isso sim é sinal de regressão do
+    // expo-sqlite e precisa aparecer no painel. Curas bem-sucedidas não reportam.
+    if (retried && isDeadHandleError(e)) {
+      captureError(e, 'database', { phase: 'execWithHeal', method });
     }
     throw e;
   }

@@ -1,5 +1,6 @@
 import Purchases from 'react-native-purchases';
 import { Platform } from 'react-native';
+import { captureError } from './sentry';
 
 // Você precisa criar uma conta no RevenueCat (https://www.revenuecat.com/)
 // E gerar as chaves de API Públicas para iOS e Android.
@@ -91,6 +92,8 @@ export const purchasePremium = async (pkg?: any) => {
   } catch (error: any) {
     if (!error.userCancelled) {
       console.error("Erro na compra:", error);
+      // Compra que falha sem ser cancelamento = receita perdida; precisa aparecer.
+      captureError(error, 'purchase', { phase: 'purchasePremium', code: error?.code });
     }
     return false;
   }
@@ -107,6 +110,7 @@ export const restorePurchases = async () => {
     return false;
   } catch (error) {
     console.error("Erro ao restaurar:", error);
+    captureError(error, 'purchase', { phase: 'restorePurchases' });
     return false;
   }
 };

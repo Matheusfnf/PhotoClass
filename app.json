@@ -47,6 +47,14 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "mf-marketing-digital",
+          "project": "react-native",
+          "url": "https://sentry.io/"
+        }
       ]
     ],
     "experiments": {
