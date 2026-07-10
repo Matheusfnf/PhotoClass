@@ -15,10 +15,12 @@ interface SpaceCardProps {
   space: Space;
   onPress: () => void;
   onLongPress?: () => void;
+  /** Abre o menu de opções (⋯). O long-press continua funcionando como atalho. */
+  onMenuPress?: () => void;
   style?: ViewStyle;
 }
 
-export function SpaceCard({ space, onPress, onLongPress, style }: SpaceCardProps) {
+export function SpaceCard({ space, onPress, onLongPress, onMenuPress, style }: SpaceCardProps) {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const scale = useSharedValue(1);
@@ -64,8 +66,22 @@ export function SpaceCard({ space, onPress, onLongPress, style }: SpaceCardProps
         <View style={[styles.accentBar, { backgroundColor: space.color }]} />
 
         <View style={styles.content}>
-          <View style={[styles.emojiContainer, { backgroundColor: space.color + '20' }]}>
-            <Text style={styles.emoji}>{space.emoji}</Text>
+          <View style={styles.topRow}>
+            <View style={[styles.emojiContainer, { backgroundColor: space.color + '20' }]}>
+              <Text style={styles.emoji}>{space.emoji}</Text>
+            </View>
+            {onMenuPress && (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onMenuPress();
+                }}
+                hitSlop={10}
+                style={({ pressed }) => [styles.menuBtn, { opacity: pressed ? 0.6 : 1 }]}
+              >
+                <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
+              </Pressable>
+            )}
           </View>
 
           <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>
@@ -108,13 +124,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
   emojiContainer: {
     width: 44,
     height: 44,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.md,
+  },
+  menuBtn: {
+    padding: 4,
+    marginTop: -2,
+    marginRight: -6,
   },
   emoji: {
     fontSize: 24,

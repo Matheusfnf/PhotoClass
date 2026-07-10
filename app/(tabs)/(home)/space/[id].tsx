@@ -93,7 +93,13 @@ export default function SpaceDetailScreen() {
             {count} {count === 1 ? 'item' : 'itens'}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        <Pressable
+          onPress={() => handleDeleteFolder(item)}
+          hitSlop={10}
+          style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}
+        >
+          <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
+        </Pressable>
       </Pressable>
     );
   };

@@ -123,6 +123,15 @@ export default function HomeScreen() {
     );
   };
 
+  // Menu de opções do espaço (⋯ ou long-press) — descobrível sem depender de gesto.
+  const handleSpaceMenu = (space: Space) => {
+    Alert.alert(space.name, 'O que deseja fazer com este espaço?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Editar', onPress: () => router.push(`/space/new?edit=${space.id}`) },
+      { text: 'Excluir', style: 'destructive', onPress: () => handleDeleteSpace(space) },
+    ]);
+  };
+
   const fabActions: FABAction[] = [
     {
       icon: 'add-circle',
@@ -203,7 +212,8 @@ export default function HomeScreen() {
             <SpaceCard
               space={item}
               onPress={() => router.push(`/space/${item.id}`)}
-              onLongPress={() => handleDeleteSpace(item)}
+              onLongPress={() => handleSpaceMenu(item)}
+              onMenuPress={() => handleSpaceMenu(item)}
               style={styles.cardWrapper}
             />
           )}
