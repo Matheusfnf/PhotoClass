@@ -3,6 +3,7 @@ import { File } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { getDatabase } from './database';
+import { captureError } from './sentry';
 
 const LAST_SYNC_KEY = 'photoclass_last_sync_at';
 const STORAGE_BUCKET = 'photoclass-files';
@@ -234,8 +235,10 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
         }
       }
 
-      // Upsert metadados
-      await supabase.from('items').upsert(
+      // Upsert metadados. O supabase-js NÃO lança em falha — devolve `error` no
+      // objeto. Sem esta checagem, uma falha de rede/RLS marcava o item como
+      // sincronizado (synced_at abaixo) e a edição nunca mais subia.
+      const { error: upsertError } = await supabase.from('items').upsert(
         {
           id: item.id,
           user_id: userId,
@@ -254,11 +257,13 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
         },
         { onConflict: 'id' }
       );
+      if (upsertError) throw upsertError; // cai no catch → tenta de novo no próximo sync
 
       const now = new Date().toISOString();
       await db.runAsync(`UPDATE items SET synced_at = ? WHERE id = ?`, [now, item.id]);
     } catch (err) {
       console.warn(`[Sync] Failed to push item ${item.id}:`, err);
+      captureError(err, 'sync', { phase: 'push-item', itemId: item.id, itemType: item.type });
     }
   }
 
@@ -311,6 +316,7 @@ async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | '
       await db.runAsync(`UPDATE items SET synced_at = ? WHERE id = ?`, [now, item.id]);
     } catch (err) {
       console.warn(`[Sync] Failed to push deleted item ${item.id}:`, err);
+      captureError(err, 'sync', { phase: 'push-deleted-item', itemId: item.id });
     }
   }
 }
@@ -321,17 +327,25 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
   const db = await getDatabase();
 
   // ── Spaces ──
-  const { data: remoteSpaces } = await supabase
+  // Se qualquer select do pull falhar, PRECISA lançar: senão o sync "dá certo",
+  // o lastSyncAt avança e as mudanças remotas daquela janela nunca mais são puxadas.
+  const { data: remoteSpaces, error: spacesError } = await supabase
     .from('spaces')
     .select('*')
     .eq('user_id', userId)
     .gt('updated_at', sinceAt);
+  if (spacesError) throw spacesError;
 
   for (const rs of remoteSpaces ?? []) {
     if (rs.deleted_at) {
       // Soft-delete remoto → deletar local em cascata
       await db.runAsync(`DELETE FROM spaces WHERE id = ?`, [rs.id]);
     } else {
+      // O WHERE do upsert protege edições locais ainda não sincronizadas: se o
+      // registro local é mais novo que o remoto, NÃO sobrescreve (e não mexe no
+      // synced_at) — assim o push seguinte ainda enxerga a mudança local e ela
+      // vence (last-write-wins). Sem isso, o pull apagava a edição local em
+      // silêncio antes do push.
       await db.runAsync(
         `INSERT INTO spaces (id, name, emoji, color, created_at, updated_at, synced_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -340,23 +354,26 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
            emoji = excluded.emoji,
            color = excluded.color,
            updated_at = excluded.updated_at,
-           synced_at = excluded.synced_at`,
+           synced_at = excluded.synced_at
+         WHERE excluded.updated_at > spaces.updated_at`,
         [rs.id, rs.name, rs.emoji, rs.color, rs.created_at, rs.updated_at, new Date().toISOString()]
       );
     }
   }
 
   // ── Folders ──
-  const { data: remoteFolders } = await supabase
+  const { data: remoteFolders, error: foldersError } = await supabase
     .from('folders')
     .select('*')
     .eq('user_id', userId)
     .gt('updated_at', sinceAt);
+  if (foldersError) throw foldersError;
 
   for (const rf of remoteFolders ?? []) {
     if (rf.deleted_at) {
       await db.runAsync(`DELETE FROM folders WHERE id = ?`, [rf.id]);
     } else {
+      // Mesma proteção de conflito dos spaces: só sobrescreve se o remoto é mais novo.
       await db.runAsync(
         `INSERT INTO folders (id, space_id, parent_id, name, created_at, updated_at, synced_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -364,18 +381,20 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
            name = excluded.name,
            parent_id = excluded.parent_id,
            updated_at = excluded.updated_at,
-           synced_at = excluded.synced_at`,
+           synced_at = excluded.synced_at
+         WHERE excluded.updated_at > folders.updated_at`,
         [rf.id, rf.space_id, rf.parent_id ?? null, rf.name, rf.created_at, rf.updated_at, new Date().toISOString()]
       );
     }
   }
 
   // ── Items ──
-  const { data: remoteItems } = await supabase
+  const { data: remoteItems, error: itemsError } = await supabase
     .from('items')
     .select('*')
     .eq('user_id', userId)
     .gt('updated_at', sinceAt);
+  if (itemsError) throw itemsError;
 
   for (const ri of remoteItems ?? []) {
     if (ri.deleted_at) {
@@ -418,6 +437,11 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
       }
     }
 
+    // Mesma proteção de conflito dos spaces: só sobrescreve se o remoto é mais
+    // novo — senão a edição local pendente venceria o pull mas já teria sido
+    // apagada. Também persiste o file_uri no UPDATE: sem isso, um arquivo
+    // re-baixado acima (premium) ficava órfão porque o novo caminho só era
+    // gravado no INSERT.
     await db.runAsync(
       `INSERT INTO items (id, folder_id, type, title, file_uri, thumbnail, duration, mime_type, file_size, notes, created_at, updated_at, storage_key, synced_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -425,9 +449,11 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
          title       = excluded.title,
          notes       = excluded.notes,
          folder_id   = excluded.folder_id,
+         file_uri    = excluded.file_uri,
          updated_at  = excluded.updated_at,
          storage_key = excluded.storage_key,
-         synced_at   = excluded.synced_at`,
+         synced_at   = excluded.synced_at
+       WHERE excluded.updated_at > items.updated_at`,
       [
         ri.id, ri.folder_id, ri.type, ri.title ?? null,
         localUri, localUri,
@@ -462,6 +488,7 @@ export async function runSync(): Promise<{ success: boolean; error?: string }> {
     return { success: true };
   } catch (err: any) {
     console.error('[Sync] Error:', err);
+    captureError(err, 'sync', { phase: 'runSync' });
     return { success: false, error: err?.message ?? 'Erro desconhecido' };
   }
 }
