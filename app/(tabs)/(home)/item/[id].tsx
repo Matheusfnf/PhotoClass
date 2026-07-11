@@ -48,7 +48,9 @@ export default function ItemDetailScreen() {
   const [folderItems, setFolderItems] = useState<Item[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isIndexReady, setIsIndexReady] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPhotoZoomed, setIsPhotoZoomed] = useState(false);
+  // Incrementa pra mandar o ZoomableImage voltar ao tamanho normal (botão do canto).
+  const [zoomResetTrigger, setZoomResetTrigger] = useState(0);
   const [isScrubbingAudio, setIsScrubbingAudio] = useState(false);
   const [showInfoSheet, setShowInfoSheet] = useState(false);
   const flatListRef = useRef<PagerView>(null);
@@ -423,8 +425,15 @@ const renderActionBar = () => {
             onPress={() => currentItem && router.push(`/note/${currentItem.id}`)}
             style={styles.actionBtn}
           >
-            <Ionicons name="reader-outline" size={20} color={colors.textSecondary} />
-            <Text style={[styles.actionBtnText, { color: colors.textSecondary }]}>Anotações</Text>
+            {/* Preenchido + cor primária = este item TEM anotações; vazado/cinza = não tem. */}
+            <Ionicons
+              name={currentItem?.notes ? 'reader' : 'reader-outline'}
+              size={20}
+              color={currentItem?.notes ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.actionBtnText, { color: currentItem?.notes ? colors.primary : colors.textSecondary }]}>
+              Anotações
+            </Text>
           </Pressable>
           <Pressable onPress={handleShare} style={styles.actionBtn}>
             <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
@@ -583,12 +592,12 @@ return (
         headerStyle: undefined,
         headerTintColor: undefined,
         title: currentItem.title ?? (currentItem.type === 'photo' ? 'Foto' : currentItem.type === 'audio' ? 'Áudio' : 'Documento'),
-        headerShown: currentItem.type === 'photo' ? !isFullscreen : true,
+        headerShown: true,
         headerLeft: undefined,
 
       }}
     />
-    {(!isFullscreen || currentItem.type !== 'photo') && renderActionBar()}
+    {renderActionBar()}
 
     {isDrawingMode && currentItem.type === 'photo' ? (
       <View style={styles.drawingModeContainer}>
@@ -648,7 +657,9 @@ return (
             ref={flatListRef}
             style={styles.pagerView}
             initialPage={currentIndex}
-            scrollEnabled={!(currentItem.type === 'photo' && isFullscreen) && !isScrubbingAudio}
+            // Foto ampliada (zoom) → o arrasto pertence à foto, não ao pager.
+            // No modo imersivo sem zoom o swipe entre fotos continua funcionando.
+            scrollEnabled={!isPhotoZoomed && !isScrubbingAudio}
             onPageSelected={(e) => {
               const idx = e.nativeEvent.position;
               setCurrentIndex(idx);
@@ -682,86 +693,39 @@ return (
                     </Pressable>
                   </View>
                 ) : loopItem.type === 'photo' ? (
-                  <ScrollView
-                    style={{ flex: 1, width: '100%' }}
-                    contentContainerStyle={{ flexGrow: 1 }}
-                    scrollEnabled={!isFullscreen}
-                  >
+                  // A foto ocupa a tela toda, sem rolagem — título edita-se e
+                  // anotações vivem na ação "Anotações" da barra de cima.
+                  <View style={{ flex: 1, width: '100%' }}>
                     <ZoomableImage
                       source={{ uri: `${loopItem.file_uri}?t=${loopItem.updated_at}` }}
-                      style={{
-                        width: SCREEN_WIDTH,
-                        flex: isFullscreen ? 1 : undefined,
-                        height: isFullscreen ? undefined : Dimensions.get('window').height * 0.55
-                      }}
+                      style={{ width: SCREEN_WIDTH, flex: 1 }}
                       contentFit="contain"
-                      cachePolicy="none"
+                      // Cache normal: o `?t=updated_at` na URI já invalida após edições.
+                      // (cachePolicy "none" re-decodificava a imagem toda hora = zoom pesado.)
                       transition={150}
-                      zoomEnabled={isFullscreen}
-                      onPress={() => {
-                        if (!isFullscreen) setIsFullscreen(true);
-                      }}
+                      // Pinça direto, como o app de fotos do iPhone/Android.
+                      // Toque simples não faz nada — sair do zoom é pelo botão
+                      // do canto, duplo toque ou pinça pra fora.
+                      zoomEnabled
+                      onZoomChange={setIsPhotoZoomed}
+                      resetZoomTrigger={zoomResetTrigger}
                       onLoad={(e) => {
                         if (loopItem.id === currentItem?.id) {
                           setImgDims({ width: e.source.width, height: e.source.height });
                         }
                       }}
                     />
-
-                    {isFullscreen && (
-                      <View style={{ position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center' }}>
-                        <Pressable
-                          style={({ pressed }) => [
-                            {
-                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                              paddingHorizontal: 24,
-                              paddingVertical: 12,
-                              borderRadius: 30,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 8,
-                            },
-                            pressed && { opacity: 0.8 }
-                          ]}
-                          onPress={() => setIsFullscreen(false)}
-                        >
-                          <Ionicons name="contract" size={20} color="#FFF" />
-                          <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>Sair do Zoom</Text>
-                        </Pressable>
-                      </View>
+                    {/* Botão discreto pra sair do zoom — só aparece com a foto ampliada */}
+                    {isPhotoZoomed && loopItem.id === currentItem?.id && (
+                      <Pressable
+                        onPress={() => setZoomResetTrigger((t) => t + 1)}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.exitZoomBtn, { opacity: pressed ? 0.7 : 1 }]}
+                      >
+                        <Ionicons name="contract" size={16} color="#FFF" />
+                      </Pressable>
                     )}
-
-                    {!isFullscreen && (
-                      <View style={[styles.detailContent, {
-                        paddingTop: Spacing.xl,
-                        backgroundColor: colors.surfaceElevated,
-                        width: '100%',
-                        flexGrow: 1,
-                        borderTopLeftRadius: BorderRadius['2xl'],
-                        borderTopRightRadius: BorderRadius['2xl'],
-                        marginTop: -Spacing.sm, // Slight overlap to feel connected
-                      }]}>
-                        <Pressable onPress={handleOpenEdit}>
-                          <Text style={[styles.detailTitle, { color: colors.text }]}>
-                            {loopItem.title ?? 'Foto'}
-                          </Text>
-                          <View style={styles.detailMeta}>
-                            <Text style={[styles.detailMetaText, { color: colors.textSecondary }]}>
-                              {new Date(loopItem.created_at).toLocaleDateString('pt-BR', {
-                                day: '2-digit', month: 'long', year: 'numeric',
-                              })}
-                            </Text>
-                            {loopItem.file_size != null && loopItem.file_size > 0 && (
-                              <Text style={[styles.detailMetaText, { color: colors.textMuted }]}>
-                                {formatFileSize(loopItem.file_size)}
-                              </Text>
-                            )}
-                          </View>
-                        </Pressable>
-                        {renderNotesCard(loopItem)}
-                      </View>
-                    )}
-                  </ScrollView>
+                  </View>
                 ) : loopItem.type === 'audio' ? (
                   <ScrollView contentContainerStyle={styles.detailContent}>
                     <Pressable onPress={handleOpenEdit}>
@@ -887,7 +851,7 @@ return (
 
 
 {
-  !isFullscreen && folderItems.length > 1 && folderItems.length <= 20 && (
+  folderItems.length > 1 && folderItems.length <= 20 && (
     <View style={styles.dotsContainer}>
       {folderItems.map((_, idx) => (
         <Pressable
@@ -900,13 +864,6 @@ return (
   )
 }
 
-{
-  item?.type === 'photo' && isFullscreen && (
-    <View style={styles.fullscreenHint} pointerEvents="none">
-      <Text style={styles.fullscreenHintText}>Toque para sair • Pinça para zoom</Text>
-    </View>
-  )
-}
         </>
       )}
 { renderInfoSheet() }
@@ -1129,20 +1086,17 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#FFF',
   },
-  fullscreenHint: {
+  exitZoomBtn: {
     position: 'absolute',
-    bottom: 48,
-    left: 0,
-    right: 0,
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  fullscreenHintText: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-  },
-
   // Drawing mode
   drawingModeContainer: {
     flex: 1,
