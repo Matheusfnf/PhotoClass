@@ -41,7 +41,7 @@ export function initSentry() {
  */
 export function captureError(
   error: unknown,
-  area: 'sync' | 'database' | 'purchase' | 'auth',
+  area: 'sync' | 'database' | 'purchase' | 'auth' | 'ocr',
   extra?: Record<string, unknown>
 ) {
   if (!_initialized) return;

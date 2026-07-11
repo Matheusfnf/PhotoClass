@@ -25,6 +25,7 @@ import { generateId } from '@/lib/uuid';
 import { getDatabase } from '@/lib/database';
 import { downloadFile } from '@/lib/sync';
 import { useAuth } from '@/context/AuthContext';
+import { captureError } from '@/lib/sentry';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AudioRecorder } from '@/components/AudioRecorder';
 
@@ -57,6 +58,7 @@ export default function NoteScreen() {
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [showRecorder, setShowRecorder] = useState(false);
   const [savingAudio, setSavingAudio] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
 
   // Último estado PERSISTIDO — base do delta de cota e da detecção de "sujo".
@@ -152,6 +154,54 @@ export default function NoteScreen() {
     };
   }, [saveNow]);
 
+  // ── Transcrição (OCR no dispositivo via ML Kit — grátis e offline) ─────────
+
+  const handleTranscribe = async () => {
+    const current = itemRef.current;
+    if (!current || current.type !== 'photo' || !current.file_uri) return;
+    setTranscribing(true);
+    try {
+      // require tardio: em builds sem o módulo nativo (ex.: dev build antigo),
+      // o botão avisa em vez de derrubar o app no import.
+      let TextRecognition: any;
+      try {
+        TextRecognition = require('@react-native-ml-kit/text-recognition').default;
+      } catch {
+        Alert.alert('Indisponível', 'O reconhecimento de texto precisa de uma versão mais nova do app.');
+        return;
+      }
+
+      const result = await TextRecognition.recognize(current.file_uri);
+      const text = (result?.text ?? '').trim();
+      if (!text) {
+        Alert.alert('Nada encontrado', 'Não consegui identificar texto nesta foto. Funciona melhor com texto impresso e boa iluminação.');
+        return;
+      }
+
+      // Acrescenta ao fim das anotações existentes (não substitui nada).
+      const currentNotes = liveText.current.notes;
+      const merged = currentNotes.trim() ? `${currentNotes.trimEnd()}\n\n${text}` : text;
+
+      const delta = textBytes(merged) - textBytes(currentNotes);
+      if (delta > 0) {
+        const { allowed } = await checkStorageLimit(delta, profile?.plan_tier);
+        if (!allowed) {
+          Alert.alert('Limite Excedido', 'O texto transcrito ultrapassa seu limite de armazenamento.');
+          return;
+        }
+      }
+
+      // Passa pelo mesmo fluxo da digitação: atualiza o estado e agenda o autosave.
+      onChangeNotes(merged);
+    } catch (e) {
+      console.error('Transcribe error:', e);
+      captureError(e, 'ocr', { itemId: current.id });
+      Alert.alert('Erro', 'Não foi possível transcrever o texto da foto.');
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
   // ── Áudios anexados ─────────────────────────────────────────────────────────
 
   const handleRecordingComplete = async (uri: string, durationSeconds: number) => {
@@ -210,7 +260,7 @@ export default function NoteScreen() {
           }
         },
       },
-    ]);
+    ], { cancelable: true });
   };
 
   // Áudio ainda na nuvem (free tier baixa sob demanda) → download manual.
@@ -337,6 +387,24 @@ export default function NoteScreen() {
               textAlignVertical="top"
               scrollEnabled={false}
             />
+
+            {/* Transcrever texto da foto (OCR no aparelho) — só pra fotos baixadas */}
+            {item.type === 'photo' && !!item.file_uri && (
+              <Pressable
+                style={[styles.transcribeButton, { borderColor: colors.borderLight, backgroundColor: colors.surface }]}
+                disabled={transcribing}
+                onPress={handleTranscribe}
+              >
+                {transcribing ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="scan-outline" size={18} color={colors.primary} />
+                )}
+                <Text style={[styles.transcribeButtonText, { color: colors.primary }]}>
+                  {transcribing ? 'Transcrevendo…' : 'Transcrever texto da foto'}
+                </Text>
+              </Pressable>
+            )}
 
             {/* Áudios anexados — a dica acima deixa claro sobre O QUE é a gravação */}
             <View style={styles.audioSection}>
@@ -519,6 +587,20 @@ const styles = StyleSheet.create({
   downloadText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
+  },
+  transcribeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginTop: Spacing.md,
+  },
+  transcribeButtonText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
   },
   recordButton: {
     flexDirection: 'row',
