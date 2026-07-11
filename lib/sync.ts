@@ -381,6 +381,7 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
          VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
+           space_id = excluded.space_id,
            parent_id = excluded.parent_id,
            updated_at = excluded.updated_at,
            synced_at = excluded.synced_at

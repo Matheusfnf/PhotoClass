@@ -18,7 +18,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
-import { getFolder, getFolders, deleteFolder, getFolderAncestry, type Folder } from '@/lib/folders';
+import { getFolder, getFolders, deleteFolder, moveFolderToSpace, getFolderAncestry, type Folder } from '@/lib/folders';
+import { SpacePickerModal } from '@/components/ui/SpacePickerModal';
+import { OptionsSheet } from '@/components/ui/OptionsSheet';
 import { getSpace, type Space } from '@/lib/spaces';
 import { getItems, createItem, deleteItem, updateItem, type Item } from '@/lib/items';
 import { copyFileToAppStorage, moveFileToAppStorage, getFileSize, formatFileSize, deleteFile } from '@/lib/files';
@@ -50,6 +52,10 @@ export default function FolderDetailScreen() {
   const [showRecorder, setShowRecorder] = useState(false);
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [itemToMove, setItemToMove] = useState<Item | null>(null);
+  const [folderToMove, setFolderToMove] = useState<Folder | null>(null);
+  // Alvos dos menus de opções (bottom sheet) — item do grid e subpasta.
+  const [menuItem, setMenuItem] = useState<Item | null>(null);
+  const [menuFolder, setMenuFolder] = useState<Folder | null>(null);
   const [isOverQuota, setIsOverQuota] = useState(false);
   const [quotaDetails, setQuotaDetails] = useState({ used: 0, limit: 0 });
 
@@ -224,10 +230,12 @@ export default function FolderDetailScreen() {
     }
   };
 
-  const handleItemAction = (item: Item) => {
-    Alert.alert('Opções do Arquivo', 'O que deseja fazer com este item?', [
+  // Abre o bottom sheet de opções do item (o Alert nativo ignorava o toque-fora).
+  const handleItemAction = (item: Item) => setMenuItem(item);
+
+  const confirmDeleteItem = (item: Item) => {
+    Alert.alert('Excluir Item', 'Este item será removido permanentemente.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Mover para...', onPress: () => { setItemToMove(item); setShowFolderPicker(true); } },
       {
         text: 'Excluir',
         style: 'destructive',
@@ -245,7 +253,7 @@ export default function FolderDetailScreen() {
           }
         },
       },
-    ]);
+    ], { cancelable: true });
   };
 
   const handleMoveItem = async (targetFolderId: string) => {
@@ -274,8 +282,24 @@ export default function FolderDetailScreen() {
             load();
           },
         },
-      ]
+      ],
+      { cancelable: true }
     );
+  };
+
+  // Menu de opções da subpasta — padronizado com o menu dos itens.
+  const handleFolderMenu = (targetFolder: Folder) => setMenuFolder(targetFolder);
+
+  const handleMoveFolderToSpace = async (targetSpaceId: string) => {
+    if (!folderToMove) return;
+    setFolderToMove(null);
+    try {
+      await moveFolderToSpace(folderToMove.id, targetSpaceId);
+      load();
+    } catch (e) {
+      console.error('Failed to move folder:', e);
+      Alert.alert('Erro', 'Não foi possível mover a pasta.');
+    }
   };
 
   const handleRecordingComplete = async (uri: string, durationSeconds: number) => {
@@ -553,7 +577,7 @@ export default function FolderDetailScreen() {
               <Pressable
                   key={sf.id}
                   onPress={() => router.push(`/folder/${sf.id}`)}
-                  onLongPress={() => handleDeleteFolder(sf)}
+                  onLongPress={() => handleFolderMenu(sf)}
                   style={({ pressed }) => [
                     styles.folderCard,
                     {
@@ -576,7 +600,7 @@ export default function FolderDetailScreen() {
                     </Text>
                   </View>
                   <Pressable
-                    onPress={() => handleDeleteFolder(sf)}
+                    onPress={() => handleFolderMenu(sf)}
                     hitSlop={10}
                     style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}
                   >
@@ -652,6 +676,54 @@ export default function FolderDetailScreen() {
           onSelectFolder={handleMoveItem}
         />
       )}
+      {folder && (
+        <SpacePickerModal
+          visible={!!folderToMove}
+          onClose={() => setFolderToMove(null)}
+          currentSpaceId={folder.space_id}
+          onSelectSpace={handleMoveFolderToSpace}
+        />
+      )}
+
+      {/* Menu de opções do item do grid */}
+      <OptionsSheet
+        visible={!!menuItem}
+        title={menuItem?.title || (menuItem?.type === 'photo' ? 'Foto' : menuItem?.type === 'audio' ? 'Áudio' : menuItem?.type === 'note' ? 'Anotação' : 'Documento')}
+        onClose={() => setMenuItem(null)}
+        options={[
+          {
+            label: 'Mover para...',
+            icon: 'folder-open-outline',
+            onPress: () => { if (menuItem) { setItemToMove(menuItem); setShowFolderPicker(true); } },
+          },
+          {
+            label: 'Excluir',
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: () => { if (menuItem) confirmDeleteItem(menuItem); },
+          },
+        ]}
+      />
+
+      {/* Menu de opções da subpasta */}
+      <OptionsSheet
+        visible={!!menuFolder}
+        title={menuFolder?.name}
+        onClose={() => setMenuFolder(null)}
+        options={[
+          {
+            label: 'Mover para outro espaço',
+            icon: 'swap-horizontal-outline',
+            onPress: () => { if (menuFolder) setFolderToMove(menuFolder); },
+          },
+          {
+            label: 'Excluir',
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: () => { if (menuFolder) handleDeleteFolder(menuFolder); },
+          },
+        ]}
+      />
     </View>
   );
 }

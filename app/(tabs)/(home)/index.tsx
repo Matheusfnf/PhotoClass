@@ -22,6 +22,7 @@ import { SpaceCard } from '@/components/SpaceCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { FAB, type FABAction } from '@/components/ui/FAB';
+import { OptionsSheet } from '@/components/ui/OptionsSheet';
 
 import { useAuth } from '@/context/AuthContext';
 import { checkStorageLimit } from '@/lib/storage-stats';
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isOverQuota, setIsOverQuota] = useState(false);
   const [quotaDetails, setQuotaDetails] = useState({ used: 0, limit: 0 });
+  const [menuSpace, setMenuSpace] = useState<Space | null>(null);
 
   const loadSpaces = useCallback(async () => {
     if (!dbReady) return;
@@ -119,18 +121,13 @@ export default function HomeScreen() {
             loadSpaces();
           },
         },
-      ]
+      ],
+      { cancelable: true } // toque fora do alerta cancela
     );
   };
 
-  // Menu de opções do espaço (⋯ ou long-press) — descobrível sem depender de gesto.
-  const handleSpaceMenu = (space: Space) => {
-    Alert.alert(space.name, 'O que deseja fazer com este espaço?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Editar', onPress: () => router.push(`/space/new?edit=${space.id}`) },
-      { text: 'Excluir', style: 'destructive', onPress: () => handleDeleteSpace(space) },
-    ]);
-  };
+  // Menu de opções do espaço (⋯ ou long-press) — bottom sheet, fecha no toque fora.
+  const handleSpaceMenu = (space: Space) => setMenuSpace(space);
 
   const fabActions: FABAction[] = [
     {
@@ -221,6 +218,25 @@ export default function HomeScreen() {
       )}
 
       {spaces.length > 0 && <FAB actions={fabActions} />}
+
+      <OptionsSheet
+        visible={!!menuSpace}
+        title={menuSpace?.name}
+        onClose={() => setMenuSpace(null)}
+        options={[
+          {
+            label: 'Editar',
+            icon: 'create-outline',
+            onPress: () => { if (menuSpace) router.push(`/space/new?edit=${menuSpace.id}`); },
+          },
+          {
+            label: 'Excluir',
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: () => { if (menuSpace) handleDeleteSpace(menuSpace); },
+          },
+        ]}
+      />
     </SafeAreaView>
   );
 }

@@ -48,12 +48,15 @@ export const FolderPickerModal = ({ visible, onClose, spaceId, currentFolderId, 
   }, [folders, currentFolderId]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView 
-        style={styles.modalOverlay} 
+    // fade: com "slide" o backdrop escuro sobe junto e parece uma "tela preta"
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+        {/* Toque fora do conteúdo cancela (o Pressable interno engole o toque) */}
+        <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={() => {}}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={12}>
@@ -85,7 +88,8 @@ export const FolderPickerModal = ({ visible, onClose, spaceId, currentFolderId, 
               ))
             )}
           </ScrollView>
-        </View>
+        </Pressable>
+        </Pressable>
       </KeyboardAvoidingView>
     </Modal>
   );

@@ -12,7 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { getSpace, type Space } from '@/lib/spaces';
-import { getFolders, deleteFolder, type Folder } from '@/lib/folders';
+import { getFolders, deleteFolder, moveFolderToSpace, type Folder } from '@/lib/folders';
+import { SpacePickerModal } from '@/components/ui/SpacePickerModal';
+import { OptionsSheet } from '@/components/ui/OptionsSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { FAB, type FABAction } from '@/components/ui/FAB';
@@ -24,6 +26,8 @@ export default function SpaceDetailScreen() {
 
   const [space, setSpace] = useState<Space | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [folderToMove, setFolderToMove] = useState<Folder | null>(null);
+  const [menuFolder, setMenuFolder] = useState<Folder | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -52,8 +56,24 @@ export default function SpaceDetailScreen() {
             load();
           },
         },
-      ]
+      ],
+      { cancelable: true } // toque fora do alerta cancela
     );
+  };
+
+  // Menu de opções da pasta (⋯ ou long-press) — bottom sheet, fecha no toque fora.
+  const handleFolderMenu = (folder: Folder) => setMenuFolder(folder);
+
+  const handleMoveFolder = async (targetSpaceId: string) => {
+    if (!folderToMove) return;
+    setFolderToMove(null);
+    try {
+      await moveFolderToSpace(folderToMove.id, targetSpaceId);
+      load();
+    } catch (e) {
+      console.error('Failed to move folder:', e);
+      Alert.alert('Erro', 'Não foi possível mover a pasta.');
+    }
   };
 
   const fabActions: FABAction[] = [
@@ -71,7 +91,7 @@ export default function SpaceDetailScreen() {
     return (
       <Pressable
         onPress={() => router.push(`/folder/${item.id}`)}
-        onLongPress={() => handleDeleteFolder(item)}
+        onLongPress={() => handleFolderMenu(item)}
         style={({ pressed }) => [
           styles.folderCard,
           {
@@ -94,7 +114,7 @@ export default function SpaceDetailScreen() {
           </Text>
         </View>
         <Pressable
-          onPress={() => handleDeleteFolder(item)}
+          onPress={() => handleFolderMenu(item)}
           hitSlop={10}
           style={({ pressed }) => ({ padding: 4, opacity: pressed ? 0.6 : 1 })}
         >
@@ -161,6 +181,32 @@ export default function SpaceDetailScreen() {
       )}
 
       {folders.length > 0 && <FAB actions={fabActions} />}
+
+      <SpacePickerModal
+        visible={!!folderToMove}
+        onClose={() => setFolderToMove(null)}
+        currentSpaceId={id!}
+        onSelectSpace={handleMoveFolder}
+      />
+
+      <OptionsSheet
+        visible={!!menuFolder}
+        title={menuFolder?.name}
+        onClose={() => setMenuFolder(null)}
+        options={[
+          {
+            label: 'Mover para outro espaço',
+            icon: 'swap-horizontal-outline',
+            onPress: () => { if (menuFolder) setFolderToMove(menuFolder); },
+          },
+          {
+            label: 'Excluir',
+            icon: 'trash-outline',
+            destructive: true,
+            onPress: () => { if (menuFolder) handleDeleteFolder(menuFolder); },
+          },
+        ]}
+      />
     </View>
   );
 }

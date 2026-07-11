@@ -73,6 +73,35 @@ export async function updateFolder(
   }
 }
 
+/**
+ * Move uma pasta (com TODA a subárvore: subpastas e, por consequência, os itens)
+ * para outro espaço. A pasta vira raiz do espaço destino (parent_id = NULL) e
+ * cada subpasta descendente tem o space_id atualizado — sem isso elas ficariam
+ * "fantasmas" apontando pro espaço antigo. O updated_at bump garante que o sync
+ * empurra a mudança de todas as pastas afetadas.
+ */
+export async function moveFolderToSpace(id: string, targetSpaceId: string): Promise<void> {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+
+  const subtree = `
+    WITH RECURSIVE descendants(fid) AS (
+      SELECT id FROM folders WHERE id = ?
+      UNION ALL
+      SELECT f.id FROM folders f INNER JOIN descendants d ON f.parent_id = d.fid
+    )
+    SELECT fid FROM descendants`;
+
+  await db.runAsync(
+    `UPDATE folders SET space_id = ?, updated_at = ? WHERE id IN (${subtree})`,
+    [targetSpaceId, now, id]
+  );
+  await db.runAsync(
+    `UPDATE folders SET parent_id = NULL, updated_at = ? WHERE id = ?`,
+    [now, id]
+  );
+}
+
 export async function deleteFolder(id: string): Promise<void> {
   const db = await getDatabase();
   const now = new Date().toISOString();
