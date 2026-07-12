@@ -102,7 +102,6 @@ export default function NewSpaceScreen() {
               onChangeText={setName}
               placeholder="Ex: Biologia, Cálculo II..."
               placeholderTextColor={colors.textMuted}
-              autoFocus
               maxLength={50}
             />
           </View>

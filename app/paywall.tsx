@@ -237,7 +237,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(150,150,150,0.1)',
   },
   content: {
-    paddingBottom: 120,
+    // Precisa ser MAIOR que a altura do rodapé absoluto (preço + botão + links),
+    // senão os últimos benefícios ficam escondidos atrás dele sem rolagem possível.
+    paddingBottom: 280,
   },
   hero: {
     alignItems: 'center',

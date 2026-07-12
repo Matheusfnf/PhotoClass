@@ -78,20 +78,27 @@ export default function ItemDetailScreen() {
   useEffect(() => { currentIdRef.current = currentItem?.id ?? null; }, [currentItem?.id]);
 
   // Ao voltar pra esta tela (ex.: depois de editar em /note/[id]), recarrega os
-  // itens pra o card de anotações refletir o texto novo.
+  // itens e REANCORA o pager no item que estava visível — sem isso o refresh
+  // podia deixar o pager em outro item (áudio, etc.) em vez da foto aberta.
   useFocusEffect(
     useCallback(() => {
       const folderId = item?.folder_id;
-      if (!folderId) return;
+      // Só depois da carga inicial: rodar antes bagunça o initialPage do pager.
+      if (!folderId || !isIndexReady) return;
       getItems(folderId)
         .then((all) => {
           const media = all.filter((i) => i.type !== 'note');
           setFolderItems(media);
-          const cur = media.find((i) => i.id === currentIdRef.current);
-          if (cur) setItem(cur);
+          const idx = media.findIndex((i) => i.id === currentIdRef.current);
+          if (idx >= 0) {
+            setItem(media[idx]);
+            setCurrentIndex(idx);
+            // Reposiciona o pager nativo mesmo se ele tiver "derrapado" no refresh.
+            setTimeout(() => flatListRef.current?.setPageWithoutAnimation(idx), 0);
+          }
         })
         .catch(() => {});
-    }, [item?.folder_id])
+    }, [item?.folder_id, isIndexReady])
   );
 
   const colorsPalette = ['#FF3B30', '#34C759', '#007AFF', '#FFCC00', '#FFFFFF', '#000000'];
@@ -354,9 +361,9 @@ const renderNotesCard = (target: Item) => (
       <Text style={[styles.notesCardTitle, { color: colors.textSecondary }]}>Minhas anotações</Text>
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginLeft: 'auto' }} />
     </View>
-    {target.notes ? (
+    {target.notes?.trim() ? (
       <Text style={[styles.notesCardText, { color: colors.text }]} numberOfLines={4}>
-        {target.notes}
+        {target.notes.trim()}
       </Text>
     ) : (
       <Text style={[styles.notesCardText, { color: colors.textMuted, fontStyle: 'italic' }]}>
@@ -425,13 +432,14 @@ const renderActionBar = () => {
             onPress={() => currentItem && router.push(`/note/${currentItem.id}`)}
             style={styles.actionBtn}
           >
-            {/* Preenchido + cor primária = este item TEM anotações; vazado/cinza = não tem. */}
+            {/* Preenchido + cor primária = este item TEM anotações; vazado/cinza = não tem.
+                trim(): anotação só de espaços/quebras não conta. */}
             <Ionicons
-              name={currentItem?.notes ? 'reader' : 'reader-outline'}
+              name={currentItem?.notes?.trim() ? 'reader' : 'reader-outline'}
               size={20}
-              color={currentItem?.notes ? colors.primary : colors.textSecondary}
+              color={currentItem?.notes?.trim() ? colors.primary : colors.textSecondary}
             />
-            <Text style={[styles.actionBtnText, { color: currentItem?.notes ? colors.primary : colors.textSecondary }]}>
+            <Text style={[styles.actionBtnText, { color: currentItem?.notes?.trim() ? colors.primary : colors.textSecondary }]}>
               Anotações
             </Text>
           </Pressable>
@@ -668,8 +676,11 @@ return (
             }}
             overdrag={false}
           >
+            {/* Chave ESTÁVEL (só o id): com updated_at na chave, editar anotações
+                remontava a página e o pager nativo "caía" em outro item ao voltar.
+                O refresh visual da imagem já vem do ?t=updated_at na URI. */}
             {(folderItems.length > 0 ? folderItems : (item ? [item] : [])).map((loopItem) => (
-              <View key={`${loopItem.id}-${loopItem.updated_at}`} style={styles.pagerPage}>
+              <View key={loopItem.id} style={styles.pagerPage}>
                 {(!loopItem.file_uri || loopItem.file_uri === '') ? (
                   <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl }}>
                     <Ionicons name="cloud-download-outline" size={64} color={colors.primary} />
