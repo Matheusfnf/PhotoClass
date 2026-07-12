@@ -14,7 +14,7 @@ export function SyncStatusBar() {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const { user } = useAuth();
-  const { isSyncing, syncEnabled, lastSyncAt, syncError, forceSync } = useSync();
+  const { isSyncing, lastSyncAt, syncError, forceSync } = useSync();
 
   if (!user) return null;
 
@@ -28,7 +28,6 @@ export function SyncStatusBar() {
 
   // Determina cor e ícone do status
   const getStatus = () => {
-    if (!syncEnabled) return { icon: 'cloud-offline-outline' as const, color: colors.textMuted, label: 'Backup desativado' };
     if (isSyncing) return { icon: 'sync' as const, color: colors.primary, label: 'Sincronizando...' };
     if (syncError) return { icon: 'cloud-offline-outline' as const, color: colors.error, label: 'Erro de sync' };
     if (lastSyncAt) return { icon: 'cloud-done-outline' as const, color: colors.success, label: formatTime(lastSyncAt) };
@@ -49,7 +48,7 @@ export function SyncStatusBar() {
 
       {/* Status de sync */}
       <Pressable
-        onPress={syncEnabled && !isSyncing ? forceSync : undefined}
+        onPress={!isSyncing ? forceSync : undefined}
         style={s.right}
         hitSlop={8}
       >

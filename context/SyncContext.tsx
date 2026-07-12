@@ -15,7 +15,6 @@ import { useDatabaseReady } from './DatabaseContext';
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
-const SYNC_ENABLED_KEY        = 'photoclass_sync_enabled';
 /** Chave por usuário para não vazar lastSyncAt entre contas */
 const lastSyncKey = (uid: string) => `photoclass_last_sync_${uid}`;
 const MUTATION_DEBOUNCE_MS    = 30_000;  // 30s após uma mudança (como Obsidian)
@@ -28,7 +27,6 @@ const OFFLINE_MIN_DURATION    = 5 * 60_000;  // só re-sync após reconexão se 
 
 interface SyncContextType {
   isSyncing: boolean;
-  syncEnabled: boolean;
   lastSyncAt: Date | null;
   syncError: string | null;
   isSyncInitialized: boolean;
@@ -38,20 +36,16 @@ interface SyncContextType {
   forceSync: () => Promise<void>;
   /** Restaura tudo do zero — útil ao trocar de celular */
   restoreFromCloud: () => Promise<void>;
-  /** Liga/desliga o sync automático */
-  toggleSync: () => Promise<void>;
 }
 
 const SyncContext = createContext<SyncContextType>({
   isSyncing: false,
-  syncEnabled: true,
   lastSyncAt: null,
   syncError: null,
   isSyncInitialized: false,
   triggerSync: () => {},
   forceSync: async () => {},
   restoreFromCloud: async () => {},
-  toggleSync: async () => {},
 });
 
 export function useSync() {
@@ -60,12 +54,16 @@ export function useSync() {
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
+// O sync é SEMPRE ativo — não é uma escolha do usuário. É infraestrutura: sempre
+// que há internet, o SQLite local reconcilia com o Supabase (push + pull). Sem
+// toggle pra não dar ao usuário como "desligar o backup" e depois achar que
+// perdeu dados em outro aparelho. Offline continua funcionando (grava local);
+// quando a rede volta, sincroniza sozinho.
 export function SyncProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const isDbReady = useDatabaseReady();
 
   const [isSyncing, setIsSyncing]     = useState(false);
-  const [syncEnabled, setSyncEnabled] = useState(true);
   const [lastSyncAt, setLastSyncAt]   = useState<Date | null>(null);
   const [syncError, setSyncError]     = useState<string | null>(null);
   const [isSyncInitialized, setIsSyncInitialized] = useState(false);
@@ -77,12 +75,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const lastSyncTimestamp = useRef<number>(0);
   const lastTriggeredUserId = useRef<string | null>(null);
 
-  // ── Inicialização: carrega preferência de sync ────────────────────────────
   useEffect(() => {
     isMounted.current = true;
-    AsyncStorage.getItem(SYNC_ENABLED_KEY).then((val) => {
-      if (val === 'false' && isMounted.current) setSyncEnabled(false);
-    });
     return () => { isMounted.current = false; };
   }, []);
 
@@ -159,19 +153,17 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
   // ── 1. Sync ao fazer login ─────────────────────────────────────────────────
   useEffect(() => {
-    if (user?.id && isDbReady && syncEnabled) {
+    if (user?.id && isDbReady) {
       if (lastTriggeredUserId.current === user.id) return;
       lastTriggeredUserId.current = user.id;
       doSync();
     } else if (!user) {
       lastTriggeredUserId.current = null;
     }
-  }, [user?.id, isDbReady, syncEnabled, doSync]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, isDbReady, doSync]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 2. AppState: sync ao voltar ao foreground (se passou tempo suficiente) ──
   useEffect(() => {
-    if (!syncEnabled) return;
-
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState !== 'active') return;
 
@@ -184,12 +176,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     const sub = AppState.addEventListener('change', handleAppState);
     return () => sub.remove();
-  }, [user, syncEnabled, doSync]);
+  }, [user, doSync]);
 
   // ── 3. NetInfo: sync ao reconectar (se estava offline por tempo relevante) ──
   useEffect(() => {
-    if (!syncEnabled) return;
-
     const handleNetwork = (state: NetInfoState) => {
       if (!state.isConnected || !state.isInternetReachable) {
         // Registra quando ficou offline
@@ -199,7 +189,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         offlineSince.current = null;
 
         if (offlineDuration >= OFFLINE_MIN_DURATION && user) {
-          // Estava offline por mais de 5 min → can ter mudanças locais pendentes
+          // Estava offline por mais de 5 min → pode ter mudanças locais pendentes
           doSync();
         }
       }
@@ -207,11 +197,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     const unsub = NetInfo.addEventListener(handleNetwork);
     return () => unsub();
-  }, [user, syncEnabled, doSync]);
+  }, [user, doSync]);
 
   // ── 4. triggerSync: chamado após mutações com debounce ────────────────────
   const triggerSync = useCallback(() => {
-    if (!user || !syncEnabled) return;
+    if (!user) return;
 
     // Cancela o debounce anterior
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -220,7 +210,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     debounceTimer.current = setTimeout(() => {
       doSync();
     }, MUTATION_DEBOUNCE_MS);
-  }, [user, syncEnabled, doSync]);
+  }, [user, doSync]);
 
   // ── Funções públicas ───────────────────────────────────────────────────────
   const forceSync = useCallback(async () => {
@@ -233,29 +223,15 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     await doSync(true);
   }, [doSync]);
 
-  const toggleSync = useCallback(async () => {
-    const newVal = !syncEnabled;
-    setSyncEnabled(newVal);
-    await AsyncStorage.setItem(SYNC_ENABLED_KEY, String(newVal));
-
-    if (newVal && user) {
-      doSync(); // sync imediato ao reativar
-    } else if (!newVal && debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-  }, [syncEnabled, user, doSync]);
-
   return (
     <SyncContext.Provider value={{
       isSyncing,
-      syncEnabled,
       lastSyncAt,
       syncError,
       isSyncInitialized,
       triggerSync,
       forceSync,
       restoreFromCloud,
-      toggleSync,
     }}>
       {children}
     </SyncContext.Provider>
