@@ -43,7 +43,10 @@ export function OptionsSheet({ visible, title, options, onClose }: Props) {
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         {/* Pressable interno engole o toque pra não fechar tocando no conteúdo */}
-        <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+          onPress={() => {}}
+        >
           {!!title && (
             <Text style={[styles.title, { color: colors.textSecondary }]} numberOfLines={1}>
               {title}
@@ -87,6 +90,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 340,
     borderRadius: BorderRadius.xl,
+    // Contorno sutil separa o card do backdrop (especialmente nos temas escuros)
+    borderWidth: 1,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
   },

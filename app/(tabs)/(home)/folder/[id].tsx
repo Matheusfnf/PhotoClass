@@ -21,6 +21,7 @@ import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/consta
 import { getFolder, getFolders, deleteFolder, moveFolderToSpace, getFolderAncestry, type Folder } from '@/lib/folders';
 import { SpacePickerModal } from '@/components/ui/SpacePickerModal';
 import { OptionsSheet } from '@/components/ui/OptionsSheet';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { getSpace, type Space } from '@/lib/spaces';
 import { getItems, createItem, deleteItem, updateItem, type Item } from '@/lib/items';
 import { copyFileToAppStorage, moveFileToAppStorage, getFileSize, formatFileSize, deleteFile } from '@/lib/files';
@@ -56,6 +57,7 @@ export default function FolderDetailScreen() {
   // Alvos dos menus de opções (bottom sheet) — item do grid e subpasta.
   const [menuItem, setMenuItem] = useState<Item | null>(null);
   const [menuFolder, setMenuFolder] = useState<Folder | null>(null);
+  const [confirmState, setConfirmState] = useState<{ title: string; message: string; action: () => void } | null>(null);
   const [isOverQuota, setIsOverQuota] = useState(false);
   const [quotaDetails, setQuotaDetails] = useState({ used: 0, limit: 0 });
 
@@ -234,26 +236,23 @@ export default function FolderDetailScreen() {
   const handleItemAction = (item: Item) => setMenuItem(item);
 
   const confirmDeleteItem = (item: Item) => {
-    Alert.alert('Excluir Item', 'Este item será removido permanentemente.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            // Anotações não têm arquivo (file_uri vazio) — nada a apagar do disco.
-            if (item.file_uri) await deleteFile(item.file_uri);
-            if (item.thumbnail && item.thumbnail !== item.file_uri) {
-              await deleteFile(item.thumbnail);
-            }
-            await deleteItem(item.id);
-            load();
-          } catch (e) {
-            console.error('Delete error:', e);
+    setConfirmState({
+      title: 'Excluir Item',
+      message: 'Este item será removido permanentemente.',
+      action: async () => {
+        try {
+          // Anotações não têm arquivo (file_uri vazio) — nada a apagar do disco.
+          if (item.file_uri) await deleteFile(item.file_uri);
+          if (item.thumbnail && item.thumbnail !== item.file_uri) {
+            await deleteFile(item.thumbnail);
           }
-        },
+          await deleteItem(item.id);
+          load();
+        } catch (e) {
+          console.error('Delete error:', e);
+        }
       },
-    ], { cancelable: true });
+    });
   };
 
   const handleMoveItem = async (targetFolderId: string) => {
@@ -269,22 +268,14 @@ export default function FolderDetailScreen() {
   };
 
   const handleDeleteFolder = (targetFolder: Folder) => {
-    Alert.alert(
-      'Excluir Pasta',
-      `Excluir "${targetFolder.name}"? Todos os arquivos e subpastas serão removidos.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteFolder(targetFolder.id);
-            load();
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    setConfirmState({
+      title: 'Excluir Pasta',
+      message: `Excluir "${targetFolder.name}"? Todos os arquivos e subpastas serão removidos.`,
+      action: async () => {
+        await deleteFolder(targetFolder.id);
+        load();
+      },
+    });
   };
 
   // Menu de opções da subpasta — padronizado com o menu dos itens.
@@ -459,9 +450,9 @@ export default function FolderDetailScreen() {
           <Text style={[styles.mediaTitle, { color: colors.text }]} numberOfLines={1}>
             {item.title || 'Anotação'}
           </Text>
-          {!!item.notes && (
+          {!!item.notes?.trim() && (
             <Text style={[styles.mediaMeta, { color: colors.textMuted }]} numberOfLines={2}>
-              {item.notes}
+              {item.notes.trim()}
             </Text>
           )}
           <Pressable onPress={() => handleItemAction(item)} hitSlop={8} style={styles.tileMenu}>
@@ -723,6 +714,14 @@ export default function FolderDetailScreen() {
             onPress: () => { if (menuFolder) handleDeleteFolder(menuFolder); },
           },
         ]}
+      />
+
+      <ConfirmDialog
+        visible={!!confirmState}
+        title={confirmState?.title ?? ''}
+        message={confirmState?.message}
+        onConfirm={() => confirmState?.action()}
+        onClose={() => setConfirmState(null)}
       />
     </View>
   );

@@ -28,6 +28,7 @@ import { useAuth } from '@/context/AuthContext';
 import { captureError } from '@/lib/sentry';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AudioRecorder } from '@/components/AudioRecorder';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const AUTOSAVE_MS = 1200;
 
@@ -59,6 +60,7 @@ export default function NoteScreen() {
   const [showRecorder, setShowRecorder] = useState(false);
   const [savingAudio, setSavingAudio] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [audioToDelete, setAudioToDelete] = useState<Item | null>(null);
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
 
   // Último estado PERSISTIDO — base do delta de cota e da detecção de "sujo".
@@ -127,7 +129,9 @@ export default function NoteScreen() {
 
     setSaveState('saving');
     try {
-      await updateItem(current.id, { title: t || null, notes: n || null });
+      // Texto só de espaços/quebras de linha NÃO é anotação — salva null, senão
+      // o indicador de "tem anotações" (ícone preenchido, card) acende à toa.
+      await updateItem(current.id, { title: t || null, notes: n.trim() ? n : null });
       lastSaved.current = { title: t, notes: n };
       quotaAlerted.current = false;
       setSaveState('saved');
@@ -244,23 +248,16 @@ export default function NoteScreen() {
     }
   };
 
-  const handleDeleteAudio = (audio: Item) => {
-    Alert.alert('Excluir Áudio', 'Excluir esta gravação?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (audio.file_uri) await deleteFile(audio.file_uri);
-            await deleteItem(audio.id);
-            if (itemRef.current) setAudios(await getChildAudios(itemRef.current.id));
-          } catch (e) {
-            console.error('Failed to delete attached audio:', e);
-          }
-        },
-      },
-    ], { cancelable: true });
+  const handleDeleteAudio = (audio: Item) => setAudioToDelete(audio);
+
+  const doDeleteAudio = async (audio: Item) => {
+    try {
+      if (audio.file_uri) await deleteFile(audio.file_uri);
+      await deleteItem(audio.id);
+      if (itemRef.current) setAudios(await getChildAudios(itemRef.current.id));
+    } catch (e) {
+      console.error('Failed to delete attached audio:', e);
+    }
   };
 
   // Áudio ainda na nuvem (free tier baixa sob demanda) → download manual.
@@ -477,6 +474,14 @@ export default function NoteScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       )}
+
+      <ConfirmDialog
+        visible={!!audioToDelete}
+        title="Excluir Áudio"
+        message="Excluir esta gravação?"
+        onConfirm={() => { if (audioToDelete) doDeleteAudio(audioToDelete); }}
+        onClose={() => setAudioToDelete(null)}
+      />
     </View>
   );
 }

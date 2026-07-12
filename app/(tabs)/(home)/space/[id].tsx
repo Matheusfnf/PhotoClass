@@ -15,6 +15,7 @@ import { getSpace, type Space } from '@/lib/spaces';
 import { getFolders, deleteFolder, moveFolderToSpace, type Folder } from '@/lib/folders';
 import { SpacePickerModal } from '@/components/ui/SpacePickerModal';
 import { OptionsSheet } from '@/components/ui/OptionsSheet';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { FAB, type FABAction } from '@/components/ui/FAB';
@@ -28,6 +29,7 @@ export default function SpaceDetailScreen() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folderToMove, setFolderToMove] = useState<Folder | null>(null);
   const [menuFolder, setMenuFolder] = useState<Folder | null>(null);
+  const [confirmState, setConfirmState] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -43,22 +45,14 @@ export default function SpaceDetailScreen() {
   );
 
   const handleDeleteFolder = (folder: Folder) => {
-    Alert.alert(
-      'Excluir Pasta',
-      `Excluir "${folder.name}"? Todos os arquivos dentro serão removidos.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteFolder(folder.id);
-            load();
-          },
-        },
-      ],
-      { cancelable: true } // toque fora do alerta cancela
-    );
+    setConfirmState({
+      title: 'Excluir Pasta',
+      message: `Excluir "${folder.name}"? Todos os arquivos dentro serão removidos.`,
+      action: async () => {
+        await deleteFolder(folder.id);
+        load();
+      },
+    });
   };
 
   // Menu de opções da pasta (⋯ ou long-press) — bottom sheet, fecha no toque fora.
@@ -206,6 +200,14 @@ export default function SpaceDetailScreen() {
             onPress: () => { if (menuFolder) handleDeleteFolder(menuFolder); },
           },
         ]}
+      />
+
+      <ConfirmDialog
+        visible={!!confirmState}
+        title={confirmState?.title ?? ''}
+        message={confirmState?.message}
+        onConfirm={() => confirmState?.action()}
+        onClose={() => setConfirmState(null)}
       />
     </View>
   );

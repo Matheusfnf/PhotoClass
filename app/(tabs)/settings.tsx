@@ -282,57 +282,67 @@ export default function AccountScreen() {
           <Text style={[styles.sectionLabelText, { color: colors.textMuted }]}>APARÊNCIA</Text>
         </View>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+          {/* Gratuitos: Default (o dark, identidade do app) e Light. O resto é Pro. */}
           <View style={styles.themesContainer}>
-            <ThemeOption 
-              label="Default" 
-              isSelected={!profile?.theme || profile.theme === 'default' || profile.theme === 'dark'} 
-              color={Palette.gray800} 
-              onPress={() => handleThemeChange('default')} 
+            <ThemeOption
+              label="Default"
+              isSelected={!profile?.theme || profile.theme === 'default' || profile.theme === 'dark'}
+              color={Palette.gray800}
+              onPress={() => handleThemeChange('default')}
               colors={colors}
             />
-            <ThemeOption 
-              label="AMOLED" 
-              isSelected={profile?.theme === 'dark-amoled'} 
-              color="#000000" 
-              onPress={() => handleThemeChange('dark-amoled')} 
-              isPremium
-              hasPremium={profile?.plan_tier === 'premium'}
+            <ThemeOption
+              label="Light"
+              isSelected={profile?.theme === 'light'}
+              color="#FFFFFF"
+              onPress={() => handleThemeChange('light')}
               colors={colors}
             />
-            <ThemeOption 
-              label="Midnight" 
-              isSelected={profile?.theme === 'dark-midnight'} 
-              color="#0a0f1c" 
-              onPress={() => handleThemeChange('dark-midnight')} 
+            <ThemeOption
+              label="AMOLED"
+              isSelected={profile?.theme === 'dark-amoled'}
+              color="#000000"
+              onPress={() => handleThemeChange('dark-amoled')}
               isPremium
               hasPremium={profile?.plan_tier === 'premium'}
               colors={colors}
             />
           </View>
           <View style={[styles.themesContainer, { paddingTop: 0 }]}>
-            <ThemeOption 
-              label="Nature" 
-              isSelected={profile?.theme === 'plant-green'} 
-              color="#2E7D32" 
-              onPress={() => handleThemeChange('plant-green')} 
+            <ThemeOption
+              label="Midnight"
+              isSelected={profile?.theme === 'dark-midnight'}
+              color="#0a0f1c"
+              onPress={() => handleThemeChange('dark-midnight')}
               isPremium
               hasPremium={profile?.plan_tier === 'premium'}
               colors={colors}
             />
-            <ThemeOption 
-              label="Rose" 
-              isSelected={profile?.theme === 'rose-pink'} 
-              color="#D81B60" 
-              onPress={() => handleThemeChange('rose-pink')} 
+            <ThemeOption
+              label="Nature"
+              isSelected={profile?.theme === 'plant-green'}
+              color="#2E7D32"
+              onPress={() => handleThemeChange('plant-green')}
               isPremium
               hasPremium={profile?.plan_tier === 'premium'}
               colors={colors}
             />
-            <ThemeOption 
-              label="Pastel" 
-              isSelected={profile?.theme === 'pastel-yellow'} 
-              color="#F57F17" 
-              onPress={() => handleThemeChange('pastel-yellow')} 
+            <ThemeOption
+              label="Rose"
+              isSelected={profile?.theme === 'rose-pink'}
+              color="#D81B60"
+              onPress={() => handleThemeChange('rose-pink')}
+              isPremium
+              hasPremium={profile?.plan_tier === 'premium'}
+              colors={colors}
+            />
+          </View>
+          <View style={[styles.themesContainer, { paddingTop: 0 }]}>
+            <ThemeOption
+              label="Pastel"
+              isSelected={profile?.theme === 'pastel-yellow'}
+              color="#F57F17"
+              onPress={() => handleThemeChange('pastel-yellow')}
               isPremium
               hasPremium={profile?.plan_tier === 'premium'}
               colors={colors}

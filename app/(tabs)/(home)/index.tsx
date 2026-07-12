@@ -5,7 +5,6 @@ import {
   FlatList,
   StyleSheet,
   RefreshControl,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
@@ -23,6 +22,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { FAB, type FABAction } from '@/components/ui/FAB';
 import { OptionsSheet } from '@/components/ui/OptionsSheet';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 import { useAuth } from '@/context/AuthContext';
 import { checkStorageLimit } from '@/lib/storage-stats';
@@ -39,6 +39,8 @@ export default function HomeScreen() {
   const [isOverQuota, setIsOverQuota] = useState(false);
   const [quotaDetails, setQuotaDetails] = useState({ used: 0, limit: 0 });
   const [menuSpace, setMenuSpace] = useState<Space | null>(null);
+  // Confirmação destrutiva no visual do app (substitui o Alert do sistema).
+  const [confirmState, setConfirmState] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
   const loadSpaces = useCallback(async () => {
     if (!dbReady) return;
@@ -108,22 +110,14 @@ export default function HomeScreen() {
   };
 
   const handleDeleteSpace = (space: Space) => {
-    Alert.alert(
-      'Excluir Espaço',
-      `Tem certeza que deseja excluir "${space.name}"? Todas as pastas e arquivos dentro dele serão removidos.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteSpace(space.id);
-            loadSpaces();
-          },
-        },
-      ],
-      { cancelable: true } // toque fora do alerta cancela
-    );
+    setConfirmState({
+      title: 'Excluir Espaço',
+      message: `Tem certeza que deseja excluir "${space.name}"? Todas as pastas e arquivos dentro dele serão removidos.`,
+      action: async () => {
+        await deleteSpace(space.id);
+        loadSpaces();
+      },
+    });
   };
 
   // Menu de opções do espaço (⋯ ou long-press) — bottom sheet, fecha no toque fora.
@@ -236,6 +230,14 @@ export default function HomeScreen() {
             onPress: () => { if (menuSpace) handleDeleteSpace(menuSpace); },
           },
         ]}
+      />
+
+      <ConfirmDialog
+        visible={!!confirmState}
+        title={confirmState?.title ?? ''}
+        message={confirmState?.message}
+        onConfirm={() => confirmState?.action()}
+        onClose={() => setConfirmState(null)}
       />
     </SafeAreaView>
   );
