@@ -9,7 +9,6 @@ import {
   Dimensions,
   ActivityIndicator,
   ScrollView,
-  Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useFocusEffect, router, Stack } from 'expo-router';
@@ -26,7 +25,8 @@ import { getSpace, type Space } from '@/lib/spaces';
 import { getItems, createItem, deleteItem, updateItem, type Item } from '@/lib/items';
 import { copyFileToAppStorage, moveFileToAppStorage, getFileSize, formatFileSize, deleteFile } from '@/lib/files';
 import { generateId } from '@/lib/uuid';
-import { checkStorageLimit, FREE_TIER_LIMIT_MB } from '@/lib/storage-stats';
+import { checkStorageLimit } from '@/lib/storage-stats';
+import { alertOpenSettings } from '@/lib/permissions';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FAB, type FABAction } from '@/components/ui/FAB';
 import { AudioRecorder } from '@/components/AudioRecorder';
@@ -96,14 +96,7 @@ export default function FolderDetailScreen() {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
-          'Permissão de Câmera',
-          'O PhotoClass precisa de acesso à câmera para tirar fotos da lousa e cadernos. Deseja habilitar nas configurações?',
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Abrir Configurações', onPress: () => Linking.openSettings() }
-          ]
-        );
+        alertOpenSettings('camera');
         return;
       }
 
@@ -113,8 +106,15 @@ export default function FolderDetailScreen() {
 
       if (!result.canceled && result.assets?.[0]) {
         setSaving(true);
-        await savePhoto(result.assets[0]);
+        const r = await savePhoto(result.assets[0]);
         setSaving(false);
+        if (r === 'quota') {
+          Alert.alert('Limite Excedido', 'Esta foto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade para o Pro.');
+        } else if (r === 'error') {
+          Alert.alert('Erro', 'Não foi possível salvar a foto.');
+        } else {
+          await load();
+        }
       }
     } catch (e) {
       setSaving(false);
@@ -136,10 +136,29 @@ export default function FolderDetailScreen() {
 
       if (!result.canceled && result.assets?.length) {
         setSaving(true);
+        // Salva uma a uma acumulando a cota (cada savePhoto revê o uso já gravado).
+        // Contabiliza pra dar UM aviso no fim em vez de um alerta por foto.
+        let added = 0, skipped = 0, failed = 0;
         for (const asset of result.assets) {
-          await savePhoto(asset);
+          const r = await savePhoto(asset);
+          if (r === 'ok') added++;
+          else if (r === 'quota') skipped++;
+          else failed++;
         }
+        await load();
         setSaving(false);
+
+        if (skipped > 0) {
+          const addedMsg = added > 0
+            ? `${added} ${added === 1 ? 'foto adicionada' : 'fotos adicionadas'}. `
+            : '';
+          Alert.alert(
+            'Limite de armazenamento',
+            `${addedMsg}${skipped} ${skipped === 1 ? 'foto não coube' : 'fotos não couberam'} no seu limite. Libere espaço ou faça upgrade para o Pro.`
+          );
+        } else if (failed > 0) {
+          Alert.alert('Erro', 'Algumas fotos não puderam ser salvas.');
+        }
       }
     } catch (e) {
       setSaving(false);
@@ -148,15 +167,14 @@ export default function FolderDetailScreen() {
     }
   };
 
-  const savePhoto = async (asset: ImagePicker.ImagePickerAsset) => {
-    if (!id) return;
-    
+  // Salva UMA foto. Retorna status pra quem chamou decidir o alerta/refresh —
+  // assim o lote da galeria dá um aviso só no fim, não um por foto.
+  const savePhoto = async (asset: ImagePicker.ImagePickerAsset): Promise<'ok' | 'quota' | 'error'> => {
+    if (!id) return 'error';
+
     const fileSize = asset.fileSize ?? 0;
     const { allowed } = await checkStorageLimit(fileSize, profile?.plan_tier);
-    if (!allowed) {
-      Alert.alert('Limite Excedido', `Esta foto ultrapassa seu limite de armazenamento.`);
-      return;
-    }
+    if (!allowed) return 'quota';
 
     const fileId = generateId();
     const fileName = `${fileId}.jpg`;
@@ -172,10 +190,10 @@ export default function FolderDetailScreen() {
         mime_type: 'image/jpeg',
         file_size: asset.fileSize ?? 0,
       });
-      await load();
+      return 'ok';
     } catch (e) {
       console.error('Failed to save photo:', e);
-      Alert.alert('Erro', 'Não foi possível salvar a foto.\n' + String(e));
+      return 'error';
     }
   };
 

@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, Linking } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { alertOpenSettings } from '@/lib/permissions';
 
 interface AudioRecorderProps {
   onRecordingComplete: (uri: string, durationSeconds: number) => void;
@@ -60,14 +61,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
     try {
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        Alert.alert(
-          'Permissão de Microfone',
-          'O PhotoClass precisa de acesso ao microfone para gravar áudios. Deseja habilitar nas configurações?',
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Abrir Configurações', onPress: () => Linking.openSettings() }
-          ]
-        );
+        alertOpenSettings('microphone');
         return;
       }
       // iOS requires explicitly enabling recording mode
