@@ -47,7 +47,7 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================================
 -- 4. BACKFILL: Atualizar os usuários antigos!
 -- Isso garante que as contas que você já criou antes dessa 
--- modificação também ganhem um "Profile" com limite de 50MB.
+-- modificação também ganhem um "Profile" com limite de 100MB.
 -- ============================================================
 INSERT INTO public.profiles (id, plan_tier, theme)
 SELECT id, 'free', 'default'

@@ -13,7 +13,7 @@
 --   bytes de arquivo (file_size) + bytes de texto (notes + title), só linhas vivas.
 --
 -- LIMITES: mantenha em sincronia com FREE_TIER_LIMIT_MB / PREMIUM_TIER_LIMIT_MB
--- em lib/storage-stats.ts. Hoje: free = 50 MB, premium = 1024 MB.
+-- em lib/storage-stats.ts. Hoje: free = 100 MB, premium = 2048 MB (2 GB).
 -- ============================================================================
 
 create or replace function public.enforce_storage_quota()
@@ -37,8 +37,8 @@ begin
   -- Plano do dono do item (null/ausente => tratado como free).
   select plan_tier into v_tier from public.profiles where id = new.user_id;
   v_limit := case when v_tier = 'premium'
-                  then 1024::bigint * 1024 * 1024   -- 1 GB
-                  else 50::bigint * 1024 * 1024 end; -- 50 MB
+                  then 2048::bigint * 1024 * 1024   -- 2 GB
+                  else 100::bigint * 1024 * 1024 end; -- 100 MB
 
   -- Uso atual do usuário (exclui a própria linha em caso de UPDATE).
   select coalesce(sum(

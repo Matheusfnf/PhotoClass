@@ -75,10 +75,10 @@ export function textBytes(s: string | null | undefined): number {
   return bytes;
 }
 
-export const FREE_TIER_LIMIT_MB = 50;
+export const FREE_TIER_LIMIT_MB = 100;
 export const FREE_TIER_LIMIT_BYTES = FREE_TIER_LIMIT_MB * 1024 * 1024;
 
-export const PREMIUM_TIER_LIMIT_MB = 1024;
+export const PREMIUM_TIER_LIMIT_MB = 2048; // 2 GB
 export const PREMIUM_TIER_LIMIT_BYTES = PREMIUM_TIER_LIMIT_MB * 1024 * 1024;
 
 export async function checkStorageLimit(

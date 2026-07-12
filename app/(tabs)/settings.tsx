@@ -5,7 +5,7 @@ import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, FontSize, FontWeight, Spacing, BorderRadius, Palette } from '@/constants/design';
-import { getStorageStats, type StorageStats } from '@/lib/storage-stats';
+import { getStorageStats, type StorageStats, FREE_TIER_LIMIT_BYTES, PREMIUM_TIER_LIMIT_BYTES } from '@/lib/storage-stats';
 import { formatFileSize } from '@/lib/files';
 import { useAuth } from '@/context/AuthContext';
 import { useSync } from '@/context/SyncContext';
@@ -94,6 +94,9 @@ export default function AccountScreen() {
     if (diff < 86_400_000) return `Há ${Math.floor(diff / 3_600_000)}h`;
     return d.toLocaleDateString('pt-BR');
   };
+
+  // Limite de armazenamento do plano atual (fonte da verdade em lib/storage-stats).
+  const limitBytes = profile?.plan_tier === 'premium' ? PREMIUM_TIER_LIMIT_BYTES : FREE_TIER_LIMIT_BYTES;
 
   const syncStatusColor = syncError
     ? colors.error
@@ -220,19 +223,19 @@ export default function AccountScreen() {
                 <View style={styles.storageProgressHeader}>
                   <Text style={[styles.storageProgressTitle, { color: colors.text }]}>Uso da Conta ({profile?.plan_tier === 'premium' ? 'Pro' : 'Grátis'})</Text>
                   <Text style={[styles.storageProgressText, { color: colors.textMuted }]}>
-                    {formatFileSize(stats.totalSizeBytes)} / {profile?.plan_tier === 'premium' ? 1024 : 50} MB
+                    {formatFileSize(stats.totalSizeBytes)} / {formatFileSize(limitBytes)}
                   </Text>
                 </View>
-                
+
                 <View style={[styles.progressBarBg, { backgroundColor: colors.borderLight }]}>
-                  <View 
+                  <View
                     style={[
-                      styles.progressBarFill, 
-                      { 
-                        backgroundColor: (stats.totalSizeBytes / ((profile?.plan_tier === 'premium' ? 1024 : 50) * 1024 * 1024)) > 0.9 ? colors.error : colors.primary,
-                        width: `${Math.min(100, (stats.totalSizeBytes / ((profile?.plan_tier === 'premium' ? 1024 : 50) * 1024 * 1024)) * 100)}%` 
+                      styles.progressBarFill,
+                      {
+                        backgroundColor: (stats.totalSizeBytes / limitBytes) > 0.9 ? colors.error : colors.primary,
+                        width: `${Math.min(100, (stats.totalSizeBytes / limitBytes) * 100)}%`
                       }
-                    ]} 
+                    ]}
                   />
                 </View>
                 <Pressable

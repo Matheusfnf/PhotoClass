@@ -112,7 +112,7 @@ export default function PaywallScreen() {
         <View style={styles.benefitsList}>
           <BenefitItem 
             icon="cloud-upload" 
-            title="1GB de Armazenamento" 
+            title="2GB de Armazenamento"
             description="Guarde milhares de fotos e áudios sem se preocupar com espaço."
             colors={colors}
           />
