@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, Text, StyleSheet, Pressable } from 'react-native';
+import { Modal, Text, StyleSheet, Pressable, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -42,11 +43,16 @@ export function OptionsSheet({ visible, title, options, onClose }: Props) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        {/* Pressable interno engole o toque pra não fechar tocando no conteúdo */}
-        <Pressable
-          style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-          onPress={() => {}}
+        {/* Pressable interno engole o toque pra não fechar tocando no conteúdo.
+            A "borda" é um LinearGradient por baixo do card (padding = espessura). */}
+        <Pressable style={styles.sheetWrap} onPress={() => {}}>
+        <LinearGradient
+          colors={[colors.primary, colors.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBorder}
         >
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           {!!title && (
             <Text style={[styles.title, { color: colors.textSecondary }]} numberOfLines={1}>
               {title}
@@ -72,6 +78,8 @@ export function OptionsSheet({ visible, title, options, onClose }: Props) {
               </Text>
             </Pressable>
           ))}
+        </View>
+        </LinearGradient>
         </Pressable>
       </Pressable>
     </Modal>
@@ -86,12 +94,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing['2xl'],
   },
-  sheet: {
+  sheetWrap: {
     width: '100%',
     maxWidth: 340,
+  },
+  gradientBorder: {
     borderRadius: BorderRadius.xl,
-    // Contorno sutil separa o card do backdrop (especialmente nos temas escuros)
-    borderWidth: 1,
+    padding: 2, // espessura da borda gradiente (sutil)
+  },
+  sheet: {
+    borderRadius: BorderRadius.xl - 2,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
   },

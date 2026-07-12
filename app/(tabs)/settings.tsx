@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Switch, Alert, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ export default function AccountScreen() {
   const colors = AppColors[scheme];
   const [stats, setStats] = useState<StorageStats | null>(null);
   const { user, profile, signOut, refreshProfile } = useAuth();
-  const { isSyncing, syncEnabled, lastSyncAt, syncError, toggleSync, forceSync, restoreFromCloud } = useSync();
+  const { isSyncing, lastSyncAt, syncError, forceSync, restoreFromCloud } = useSync();
 
   useFocusEffect(
     useCallback(() => {
@@ -97,8 +97,6 @@ export default function AccountScreen() {
 
   const syncStatusColor = syncError
     ? colors.error
-    : !syncEnabled
-    ? colors.textMuted
     : isSyncing
     ? colors.primary
     : lastSyncAt
@@ -107,8 +105,6 @@ export default function AccountScreen() {
 
   const syncStatusLabel = syncError
     ? `Erro: ${syncError}`
-    : !syncEnabled
-    ? 'Desativado'
     : isSyncing
     ? 'Sincronizando...'
     : lastSyncAt
@@ -116,8 +112,6 @@ export default function AccountScreen() {
     : 'Aguardando conexão';
 
   const syncStatusIcon = syncError
-    ? 'cloud-offline-outline'
-    : !syncEnabled
     ? 'cloud-offline-outline'
     : isSyncing
     ? 'sync'
@@ -166,25 +160,19 @@ export default function AccountScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-          {/* Toggle sync */}
+          {/* Info: backup é automático (sem toggle — sync é sempre ativo) */}
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <View style={[styles.iconWrap, { backgroundColor: colors.primary + '18' }]}>
-                <Ionicons name="sync-outline" size={18} color={colors.primary} />
+                <Ionicons name="cloud-done-outline" size={18} color={colors.primary} />
               </View>
-              <View>
-                <Text style={[styles.rowLabel, { color: colors.text }]}>Sync automático</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>Backup automático</Text>
                 <Text style={[styles.rowSub, { color: colors.textMuted }]}>
-                  Após mudanças e ao abrir o app
+                  Seus dados sincronizam sozinhos quando há internet
                 </Text>
               </View>
             </View>
-            <Switch
-              value={syncEnabled}
-              onValueChange={toggleSync}
-              trackColor={{ false: colors.border, true: colors.primary + '60' }}
-              thumbColor={syncEnabled ? colors.primary : colors.textMuted}
-            />
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
@@ -192,10 +180,10 @@ export default function AccountScreen() {
           {/* Sync agora */}
           <Pressable
             onPress={forceSync}
-            disabled={isSyncing || !syncEnabled}
+            disabled={isSyncing}
             style={({ pressed }) => [
               styles.row,
-              { opacity: (pressed || isSyncing || !syncEnabled) ? 0.4 : 1 },
+              { opacity: (pressed || isSyncing) ? 0.4 : 1 },
             ]}
           >
             <View style={styles.rowLeft}>
@@ -282,13 +270,20 @@ export default function AccountScreen() {
           <Text style={[styles.sectionLabelText, { color: colors.textMuted }]}>APARÊNCIA</Text>
         </View>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-          {/* Gratuitos: Default (o dark, identidade do app) e Light. O resto é Pro. */}
+          {/* Gratuitos: Default (segue o sistema), Dark e Light fixos. O resto é Pro. */}
           <View style={styles.themesContainer}>
             <ThemeOption
               label="Default"
-              isSelected={!profile?.theme || profile.theme === 'default' || profile.theme === 'dark'}
-              color={Palette.gray800}
+              isSelected={!profile?.theme || profile.theme === 'default'}
+              isAuto
               onPress={() => handleThemeChange('default')}
+              colors={colors}
+            />
+            <ThemeOption
+              label="Dark"
+              isSelected={profile?.theme === 'dark'}
+              color="#15151F"
+              onPress={() => handleThemeChange('dark')}
               colors={colors}
             />
             <ThemeOption
@@ -298,6 +293,8 @@ export default function AccountScreen() {
               onPress={() => handleThemeChange('light')}
               colors={colors}
             />
+          </View>
+          <View style={[styles.themesContainer, { paddingTop: 0 }]}>
             <ThemeOption
               label="AMOLED"
               isSelected={profile?.theme === 'dark-amoled'}
@@ -307,8 +304,6 @@ export default function AccountScreen() {
               hasPremium={profile?.plan_tier === 'premium'}
               colors={colors}
             />
-          </View>
-          <View style={[styles.themesContainer, { paddingTop: 0 }]}>
             <ThemeOption
               label="Midnight"
               isSelected={profile?.theme === 'dark-midnight'}
@@ -327,6 +322,8 @@ export default function AccountScreen() {
               hasPremium={profile?.plan_tier === 'premium'}
               colors={colors}
             />
+          </View>
+          <View style={[styles.themesContainer, { paddingTop: 0 }]}>
             <ThemeOption
               label="Rose"
               isSelected={profile?.theme === 'rose-pink'}
@@ -336,8 +333,6 @@ export default function AccountScreen() {
               hasPremium={profile?.plan_tier === 'premium'}
               colors={colors}
             />
-          </View>
-          <View style={[styles.themesContainer, { paddingTop: 0 }]}>
             <ThemeOption
               label="Pastel"
               isSelected={profile?.theme === 'pastel-yellow'}
@@ -496,7 +491,7 @@ const statStyles = StyleSheet.create({
   label: { fontSize: FontSize.xs },
 });
 
-function ThemeOption({ label, isSelected, color, onPress, isPremium, hasPremium, colors }: any) {
+function ThemeOption({ label, isSelected, color, onPress, isPremium, hasPremium, isAuto, colors }: any) {
   return (
     <Pressable
       onPress={onPress}
@@ -508,7 +503,15 @@ function ThemeOption({ label, isSelected, color, onPress, isPremium, hasPremium,
         }
       ]}
     >
+      {isAuto ? (
+        // "Auto": metade clara, metade escura — segue o tema do celular.
+        <View style={[themeStyles.circle, themeStyles.autoCircle, { borderColor: colors.borderLight }]}>
+          <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />
+          <View style={{ flex: 1, backgroundColor: '#15151F' }} />
+        </View>
+      ) : (
       <View style={[themeStyles.circle, { backgroundColor: color, borderColor: colors.borderLight }]} />
+      )}
       <Text style={[themeStyles.label, { color: colors.text }]}>{label}</Text>
       {isPremium && !hasPremium && (
         <Ionicons name="lock-closed" size={12} color={colors.textMuted} style={{ marginTop: 2 }} />
@@ -533,6 +536,10 @@ const themeStyles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
+  autoCircle: {
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
   label: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
@@ -541,7 +548,8 @@ const themeStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: Spacing.xl, gap: Spacing.md, paddingBottom: Spacing['5xl'] },
+  // paddingBottom folgado: a tab bar agora flutua (~104px de rodapé ocupado)
+  content: { padding: Spacing.xl, gap: Spacing.md, paddingBottom: 140 },
 
   // Perfil
   profileCard: {

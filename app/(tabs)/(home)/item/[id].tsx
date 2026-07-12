@@ -1140,7 +1140,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: Spacing['4xl'],
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing['5xl'],
+    paddingBottom: 140, // folga pra tab bar flutuante
   },
   detailIcon: {
     width: 120,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -26,10 +27,15 @@ export function ConfirmDialog({ visible, title, message, confirmLabel = 'Excluir
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-          onPress={() => {}}
+        {/* "Borda" gradiente: LinearGradient por baixo do card (padding = espessura) */}
+        <Pressable style={styles.cardWrap} onPress={() => {}}>
+        <LinearGradient
+          colors={[colors.primary, colors.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBorder}
         >
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           {!!message && (
             <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>
@@ -59,6 +65,8 @@ export function ConfirmDialog({ visible, title, message, confirmLabel = 'Excluir
               <Text style={[styles.buttonText, { color: '#FFF' }]}>{confirmLabel}</Text>
             </Pressable>
           </View>
+        </View>
+        </LinearGradient>
         </Pressable>
       </Pressable>
     </Modal>
@@ -73,11 +81,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing['2xl'],
   },
-  card: {
+  cardWrap: {
     width: '100%',
     maxWidth: 340,
+  },
+  gradientBorder: {
     borderRadius: BorderRadius.xl,
-    borderWidth: 1,
+    padding: 2, // espessura da borda gradiente (sutil, par do OptionsSheet)
+  },
+  card: {
+    borderRadius: BorderRadius.xl - 2,
     padding: Spacing.xl,
     gap: Spacing.md,
   },

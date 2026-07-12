@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -151,9 +152,11 @@ export default function HomeScreen() {
           >
             <Ionicons name="help-circle-outline" size={26} color={colors.textSecondary} />
           </TouchableOpacity>
-          <View style={[styles.logoCircle, { backgroundColor: colors.primary + '20' }]}>
-            <Ionicons name="school" size={24} color={colors.primary} />
-          </View>
+          <Image
+            source={require('@/assets/images/icon.png')}
+            style={styles.logo}
+            contentFit="cover"
+          />
         </View>
       </View>
 
@@ -188,9 +191,8 @@ export default function HomeScreen() {
         <FlatList
           data={spaces}
           keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.grid}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -205,7 +207,6 @@ export default function HomeScreen() {
               onPress={() => router.push(`/space/${item.id}`)}
               onLongPress={() => handleSpaceMenu(item)}
               onMenuPress={() => handleSpaceMenu(item)}
-              style={styles.cardWrapper}
             />
           )}
         />
@@ -272,23 +273,14 @@ const styles = StyleSheet.create({
   helpButton: {
     padding: Spacing.xs,
   },
-  logoCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
   },
-  grid: {
-    paddingHorizontal: Spacing.lg,
+  list: {
+    paddingHorizontal: Spacing.xl,
     paddingBottom: 160,
-  },
-  row: {
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  cardWrapper: {
-    flex: 1,
   },
   quotaBanner: {
     flexDirection: 'row',

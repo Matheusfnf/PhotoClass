@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors, BorderRadius, FontSize, FontWeight, Shadow, Spacing } from '@/constants/design';
@@ -21,6 +22,12 @@ export function FAB({ actions, icon = 'add' }: FABProps) {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const [open, setOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // A tab bar flutua ocupando insets.bottom + 12 (offset) + 64 (altura).
+  // O FAB fica logo acima dela; o menu de ações, acima do FAB.
+  const fabBottom = insets.bottom + 92;
+  const actionsBottom = fabBottom + 72;
 
   const handleMainPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -49,7 +56,7 @@ export function FAB({ actions, icon = 'add' }: FABProps) {
 
       {/* Action items shown above FAB */}
       {open && (
-        <View style={styles.actionsColumn} pointerEvents="box-none">
+        <View style={[styles.actionsColumn, { bottom: actionsBottom }]} pointerEvents="box-none">
           {actions.map((action) => (
             <Pressable
               key={action.label}
@@ -91,6 +98,7 @@ export function FAB({ actions, icon = 'add' }: FABProps) {
         style={({ pressed }) => [
           styles.mainButton,
           {
+            bottom: fabBottom,
             backgroundColor: colors.primary,
             ...Shadow.glow(colors.primary),
             transform: [{ scale: pressed ? 0.9 : 1 }],
@@ -119,7 +127,6 @@ const styles = StyleSheet.create({
   },
   actionsColumn: {
     position: 'absolute',
-    bottom: 104,
     right: Spacing.xl,
     zIndex: 1000,
     gap: Spacing.sm,
@@ -148,7 +155,6 @@ const styles = StyleSheet.create({
   },
   mainButton: {
     position: 'absolute',
-    bottom: 32,
     right: Spacing.xl,
     width: 60,
     height: 60,

@@ -30,7 +30,7 @@ export function SpaceCard({ space, onPress, onLongPress, onMenuPress, style }: S
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 15 });
+    scale.value = withSpring(0.97, { damping: 15 });
   };
 
   const handlePressOut = () => {
@@ -54,7 +54,7 @@ export function SpaceCard({ space, onPress, onLongPress, onMenuPress, style }: S
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         style={[
-          styles.card,
+          styles.row,
           {
             backgroundColor: colors.card,
             borderColor: colors.cardBorder,
@@ -62,73 +62,67 @@ export function SpaceCard({ space, onPress, onLongPress, onMenuPress, style }: S
           },
         ]}
       >
-        {/* Color accent bar */}
-        <View style={[styles.accentBar, { backgroundColor: space.color }]} />
+        {/* Faixa de cor à esquerda, cobrindo a linha toda */}
+        <View style={[styles.accent, { backgroundColor: space.color }]} />
 
-        <View style={styles.content}>
-          <View style={styles.topRow}>
-            <View style={[styles.emojiContainer, { backgroundColor: space.color + '20' }]}>
-              <Text style={styles.emoji}>{space.emoji}</Text>
-            </View>
-            {onMenuPress && (
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  onMenuPress();
-                }}
-                hitSlop={10}
-                style={({ pressed }) => [styles.menuBtn, { opacity: pressed ? 0.6 : 1 }]}
-              >
-                <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
-              </Pressable>
-            )}
-          </View>
-
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>
-            {space.name}
-          </Text>
-
-          <View style={styles.stats}>
-            <View style={styles.stat}>
-              <Ionicons name="folder-outline" size={13} color={colors.textMuted} />
-              <Text style={[styles.statText, { color: colors.textMuted }]}>
-                {folderCount}
-              </Text>
-            </View>
-            <View style={styles.stat}>
-              <Ionicons name="images-outline" size={13} color={colors.textMuted} />
-              <Text style={[styles.statText, { color: colors.textMuted }]}>
-                {itemCount}
-              </Text>
-            </View>
-          </View>
+        {/* Emoji */}
+        <View style={[styles.emojiContainer, { backgroundColor: space.color + '20' }]}>
+          <Text style={styles.emoji}>{space.emoji}</Text>
         </View>
+
+        {/* Nome — uma linha só, truncado com reticências */}
+        <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          {space.name}
+        </Text>
+
+        {/* Contadores */}
+        <View style={styles.stat}>
+          <Ionicons name="folder-outline" size={15} color={colors.textMuted} />
+          <Text style={[styles.statText, { color: colors.textMuted }]}>{folderCount}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Ionicons name="images-outline" size={15} color={colors.textMuted} />
+          <Text style={[styles.statText, { color: colors.textMuted }]}>{itemCount}</Text>
+        </View>
+
+        {/* Menu */}
+        {onMenuPress && (
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onMenuPress();
+            }}
+            hitSlop={10}
+            style={({ pressed }) => [styles.menuBtn, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Ionicons name="ellipsis-vertical" size={18} color={colors.textMuted} />
+          </Pressable>
+        )}
       </Pressable>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    minHeight: 160,
-  },
-  accentBar: {
-    height: 4,
-    width: '100%',
-  },
-  content: {
-    padding: Spacing.lg,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  topRow: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
+    alignItems: 'center',
+    // Pílula bem arredondada, "dando liga" com a navbar flutuante
+    borderRadius: 26,
+    borderWidth: 1,
+    height: 68,
+    paddingRight: Spacing.md,
+    paddingLeft: Spacing.md,
+    gap: Spacing.md,
+    overflow: 'hidden',
+  },
+  accent: {
+    // Faixa vertical à esquerda, cobrindo a altura da linha
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 10,
   },
   emojiContainer: {
     width: 44,
@@ -136,24 +130,15 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  menuBtn: {
-    padding: 4,
-    marginTop: -2,
-    marginRight: -6,
+    marginLeft: Spacing.xs,
   },
   emoji: {
-    fontSize: 24,
+    fontSize: 22,
   },
   name: {
+    flex: 1,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.sm,
-    flex: 1,
-  },
-  stats: {
-    flexDirection: 'row',
-    gap: Spacing.md,
   },
   stat: {
     flexDirection: 'row',
@@ -161,7 +146,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statText: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.medium,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+  },
+  menuBtn: {
+    padding: 4,
+    marginLeft: 2,
   },
 });

@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Spacing.xl,
-    paddingBottom: 120,
+    paddingBottom: 140, // folga pra tab bar flutuante
   },
   parentCard: {
     flexDirection: 'row',
