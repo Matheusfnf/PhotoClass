@@ -20,7 +20,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -101,8 +101,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+  const signUp = useCallback(async (email: string, password: string, name?: string) => {
+    // Guarda o nome no user_metadata do Supabase Auth (full_name) — não precisa de
+    // coluna nova em profiles; fica disponível em user.user_metadata.full_name.
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: name?.trim() ? { data: { full_name: name.trim() } } : undefined,
+    });
     if (error) return { error: translateAuthError(error.message) };
     return { error: null };
   }, []);

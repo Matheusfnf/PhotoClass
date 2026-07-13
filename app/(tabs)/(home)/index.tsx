@@ -153,9 +153,9 @@ export default function HomeScreen() {
             <Ionicons name="help-circle-outline" size={26} color={colors.textSecondary} />
           </TouchableOpacity>
           <Image
-            source={require('@/assets/images/icon.png')}
+            source={require('@/assets/images/logo.png')}
             style={styles.logo}
-            contentFit="cover"
+            contentFit="contain"
           />
         </View>
       </View>
@@ -274,9 +274,8 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
   },
   logo: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
   },
   list: {
     paddingHorizontal: Spacing.xl,

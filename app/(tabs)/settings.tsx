@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Linking } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -459,8 +460,18 @@ export default function AccountScreen() {
           </Pressable>
         </View>
 
+        {/* Logo completa (marca) — versão clara no fundo claro, escura no escuro */}
+        <Image
+          source={
+            scheme === 'dark' || scheme === 'dark-amoled' || scheme === 'dark-midnight'
+              ? require('@/assets/images/logo-full.png')
+              : require('@/assets/images/logo-full-dark.png')
+          }
+          style={styles.brandLogo}
+          contentFit="contain"
+        />
         <Text style={[styles.footer, { color: colors.textMuted }]}>
-          PhotoClass v1.0.0 · Feito com 💜
+          v1.0.0 · Feito com 💜
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -726,10 +737,17 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     textDecorationLine: 'underline',
   },
+  brandLogo: {
+    width: 150,
+    height: 43,
+    alignSelf: 'center',
+    marginTop: Spacing['2xl'],
+    opacity: 0.9,
+  },
   footer: {
     textAlign: 'center',
     fontSize: FontSize.xs,
-    marginTop: Spacing.lg,
+    marginTop: Spacing.sm,
     paddingBottom: Spacing.lg,
   },
 });
