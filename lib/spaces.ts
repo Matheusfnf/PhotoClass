@@ -44,12 +44,30 @@ export async function getSpace(id: string): Promise<Space | null> {
   );
 }
 
+/**
+ * Nome já usado por outro espaço vivo? Espaços são todos "irmãos" (nível raiz do
+ * usuário). Comparação sem espaços nas pontas e case-insensitive via JS (trata
+ * acentos). Validação só no app — ver a nota em lib/folders.ts sobre não usar
+ * constraint no banco por causa do sync offline-first.
+ */
+async function spaceNameTaken(name: string, excludeId?: string): Promise<boolean> {
+  const db = await getDatabase();
+  const target = name.trim().toLocaleLowerCase();
+  const rows = await db.getAllAsync<{ id: string; name: string }>(
+    `SELECT id, name FROM spaces WHERE deleted_at IS NULL`
+  );
+  return rows.some((r) => r.id !== excludeId && r.name.trim().toLocaleLowerCase() === target);
+}
+
 export async function createSpace(data: {
   name: string;
   emoji: string;
   color: string;
 }): Promise<Space> {
   const db = await getDatabase();
+  if (await spaceNameTaken(data.name)) {
+    throw new Error('DUPLICATE_NAME');
+  }
   const id = generateId();
   const now = new Date().toISOString();
   await db.runAsync(
@@ -65,6 +83,9 @@ export async function updateSpace(
 ): Promise<void> {
   const db = await getDatabase();
   const now = new Date().toISOString();
+  if (data.name !== undefined && (await spaceNameTaken(data.name, id))) {
+    throw new Error('DUPLICATE_NAME');
+  }
   const sets: string[] = ['updated_at = ?'];
   const values: any[] = [now];
 

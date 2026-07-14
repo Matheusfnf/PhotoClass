@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { AppColors, FontSize, FontWeight, Spacing, BorderRadius, Palette } from 
 import { LinearGradient } from 'expo-linear-gradient';
 import { purchasePremium, restorePurchases, getManagementURL } from '@/lib/revenuecat';
 import { usePremium } from '@/context/PremiumContext';
+import { useDialog } from '@/context/DialogContext';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 
 /** Fallback caso o RevenueCat não devolva a managementURL. */
@@ -24,6 +25,7 @@ export default function PaywallScreen() {
   const [packageToBuy, setPackageToBuy] = useState<any>(null);
   const [priceString, setPriceString] = useState('R$ 9,90');
   const { isPremium } = usePremium();
+  const dialog = useDialog();
 
   React.useEffect(() => {
     const fetchOfferings = async () => {
@@ -44,10 +46,10 @@ export default function PaywallScreen() {
     // O premium vale pela verdade do RevenueCat: o PremiumProvider escuta a compra,
     // atualiza isPremium e reconcilia o plan_tier — não setamos à mão.
     if (success) {
-      Alert.alert('Sucesso!', 'Bem-vindo ao PhotoClass Pro. Aproveite seus novos recursos!');
+      dialog.alert('Sucesso!', 'Bem-vindo ao PhotoClass Pro. Aproveite seus novos recursos!');
       router.back();
     } else {
-      Alert.alert('Erro', 'Não foi possível processar a assinatura no momento.');
+      dialog.alert('Erro', 'Não foi possível processar a assinatura no momento.');
     }
     setLoading(false);
   };
@@ -56,10 +58,10 @@ export default function PaywallScreen() {
     setRestoring(true);
     const ok = await restorePurchases();
     if (ok) {
-      Alert.alert('Compra restaurada', 'Bem-vindo de volta ao PhotoClass Pro! 💜');
+      dialog.alert('Compra restaurada', 'Bem-vindo de volta ao PhotoClass Pro! 💜');
       router.back();
     } else {
-      Alert.alert('Nada para restaurar', 'Não encontramos uma assinatura ativa nesta conta.');
+      dialog.alert('Nada para restaurar', 'Não encontramos uma assinatura ativa nesta conta.');
     }
     setRestoring(false);
   };
@@ -71,7 +73,7 @@ export default function PaywallScreen() {
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Ops', 'Não foi possível abrir a tela de assinaturas da Play Store.');
+      dialog.alert('Ops', 'Não foi possível abrir a tela de assinaturas da Play Store.');
     }
   };
 

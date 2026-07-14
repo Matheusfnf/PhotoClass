@@ -21,7 +21,8 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#050624",
+        "backgroundColor": "#6A23DE",
+        "backgroundImage": "./assets/images/android-icon-background.png",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -41,9 +42,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#050624",
+          "backgroundColor": "#FFFFFF",
           "dark": {
-            "backgroundColor": "#050624"
+            "backgroundColor": "#11111B"
           }
         }
       ],
@@ -54,7 +55,8 @@
           "project": "react-native",
           "url": "https://sentry.io/"
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

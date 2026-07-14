@@ -3,6 +3,7 @@ import { Modal, View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { BRAND_GRADIENT } from '@/context/DialogContext';
 
 const DESTRUCTIVE = '#FF7675';
 
@@ -30,7 +31,7 @@ export function ConfirmDialog({ visible, title, message, confirmLabel = 'Excluir
         {/* "Borda" gradiente: LinearGradient por baixo do card (padding = espessura) */}
         <Pressable style={styles.cardWrap} onPress={() => {}}>
         <LinearGradient
-          colors={[colors.primary, colors.accent]}
+          colors={BRAND_GRADIENT}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradientBorder}

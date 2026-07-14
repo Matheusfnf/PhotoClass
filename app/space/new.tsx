@@ -7,11 +7,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing, SpaceColors, SpaceEmojis } from '@/constants/design';
+import { useDialog } from '@/context/DialogContext';
 import { createSpace, updateSpace, getSpace } from '@/lib/spaces';
 import { EmojiPicker } from '@/components/EmojiPicker';
 import { ColorPicker } from '@/components/ColorPicker';
@@ -23,6 +23,7 @@ export default function NewSpaceScreen() {
   const colors = AppColors[scheme];
   const params = useLocalSearchParams<{ edit?: string }>();
   const isEditing = !!params.edit;
+  const dialog = useDialog();
 
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState<string>(SpaceEmojis[0]);
@@ -45,7 +46,7 @@ export default function NewSpaceScreen() {
   const handleSave = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      Alert.alert('Atenção', 'Digite um nome para o espaço.');
+      dialog.alert('Atenção', 'Digite um nome para o espaço.');
       return;
     }
 
@@ -57,9 +58,13 @@ export default function NewSpaceScreen() {
         await createSpace({ name: trimmed, emoji, color });
       }
       router.back();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Erro', 'Não foi possível salvar o espaço.');
+      if (e?.message === 'DUPLICATE_NAME') {
+        dialog.alert('Nome já usado', `Já existe um espaço chamado "${trimmed}". Escolha outro nome.`);
+      } else {
+        dialog.alert('Erro', 'Não foi possível salvar o espaço.');
+      }
     } finally {
       setSaving(false);
     }

@@ -5,7 +5,6 @@ import {
   FlatList,
   StyleSheet,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +15,7 @@ import { getFolders, deleteFolder, moveFolderToSpace, type Folder } from '@/lib/
 import { SpacePickerModal } from '@/components/ui/SpacePickerModal';
 import { OptionsSheet } from '@/components/ui/OptionsSheet';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useDialog } from '@/context/DialogContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { FAB, type FABAction } from '@/components/ui/FAB';
@@ -24,6 +24,7 @@ export default function SpaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
+  const dialog = useDialog();
 
   const [space, setSpace] = useState<Space | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -64,9 +65,13 @@ export default function SpaceDetailScreen() {
     try {
       await moveFolderToSpace(folderToMove.id, targetSpaceId);
       load();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to move folder:', e);
-      Alert.alert('Erro', 'Não foi possível mover a pasta.');
+      if (e?.message === 'DUPLICATE_NAME') {
+        dialog.alert('Nome já usado', 'O espaço de destino já tem uma pasta com esse nome. Renomeie antes de mover.');
+      } else {
+        dialog.alert('Erro', 'Não foi possível mover a pasta.');
+      }
     }
   };
 

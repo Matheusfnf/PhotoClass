@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -25,6 +24,7 @@ import { generateId } from '@/lib/uuid';
 import { getDatabase } from '@/lib/database';
 import { downloadFile } from '@/lib/sync';
 import { useAuth } from '@/context/AuthContext';
+import { useDialog } from '@/context/DialogContext';
 import { captureError } from '@/lib/sentry';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { AudioRecorder } from '@/components/AudioRecorder';
@@ -51,6 +51,7 @@ export default function NoteScreen() {
   const colors = AppColors[scheme];
   const { profile } = useAuth();
   const { createItem, updateItem, deleteItem } = useSyncedMutations();
+  const dialog = useDialog();
 
   const [item, setItem] = useState<Item | null>(null);
   const [audios, setAudios] = useState<Item[]>([]);
@@ -121,7 +122,7 @@ export default function NoteScreen() {
         setSaveState('blocked');
         if (!quotaAlerted.current) {
           quotaAlerted.current = true;
-          Alert.alert('Limite Excedido', 'Este texto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade.');
+          dialog.alert('Limite Excedido', 'Este texto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade.');
         }
         return;
       }
@@ -171,14 +172,14 @@ export default function NoteScreen() {
       try {
         TextRecognition = require('@react-native-ml-kit/text-recognition').default;
       } catch {
-        Alert.alert('Indisponível', 'O reconhecimento de texto precisa de uma versão mais nova do app.');
+        dialog.alert('Indisponível', 'O reconhecimento de texto precisa de uma versão mais nova do app.');
         return;
       }
 
       const result = await TextRecognition.recognize(current.file_uri);
       const text = (result?.text ?? '').trim();
       if (!text) {
-        Alert.alert('Nada encontrado', 'Não consegui identificar texto nesta foto. Funciona melhor com texto impresso e boa iluminação.');
+        dialog.alert('Nada encontrado', 'Não consegui identificar texto nesta foto. Funciona melhor com texto impresso e boa iluminação.');
         return;
       }
 
@@ -190,7 +191,7 @@ export default function NoteScreen() {
       if (delta > 0) {
         const { allowed } = await checkStorageLimit(delta, profile?.plan_tier);
         if (!allowed) {
-          Alert.alert('Limite Excedido', 'O texto transcrito ultrapassa seu limite de armazenamento.');
+          dialog.alert('Limite Excedido', 'O texto transcrito ultrapassa seu limite de armazenamento.');
           return;
         }
       }
@@ -200,7 +201,7 @@ export default function NoteScreen() {
     } catch (e) {
       console.error('Transcribe error:', e);
       captureError(e, 'ocr', { itemId: current.id });
-      Alert.alert('Erro', 'Não foi possível transcrever o texto da foto.');
+      dialog.alert('Erro', 'Não foi possível transcrever o texto da foto.');
     } finally {
       setTranscribing(false);
     }
@@ -219,7 +220,7 @@ export default function NoteScreen() {
       const fileSizeBytes = await getFileSize(uri);
       const { allowed } = await checkStorageLimit(fileSizeBytes, profile?.plan_tier);
       if (!allowed) {
-        Alert.alert('Limite Excedido', 'Este áudio ultrapassa seu limite de armazenamento.');
+        dialog.alert('Limite Excedido', 'Este áudio ultrapassa seu limite de armazenamento.');
         setShowRecorder(false);
         return;
       }
@@ -241,7 +242,7 @@ export default function NoteScreen() {
       setAudios(await getChildAudios(current.id));
     } catch (e) {
       console.error('Failed to save attached recording:', e);
-      Alert.alert('Erro', 'Não foi possível salvar a gravação.');
+      dialog.alert('Erro', 'Não foi possível salvar a gravação.');
       setShowRecorder(false);
     } finally {
       setSavingAudio(false);
@@ -279,7 +280,7 @@ export default function NoteScreen() {
       if (itemRef.current) setAudios(await getChildAudios(itemRef.current.id));
     } catch (e) {
       console.error('Failed to download attached audio:', e);
-      Alert.alert('Erro', 'Não foi possível baixar o áudio da nuvem.');
+      dialog.alert('Erro', 'Não foi possível baixar o áudio da nuvem.');
     } finally {
       setDownloading((prev) => ({ ...prev, [audio.id]: false }));
     }
@@ -457,7 +458,7 @@ export default function NoteScreen() {
                 disabled={savingAudio}
                 onPress={async () => {
                   const { allowed } = await checkStorageLimit(0, profile?.plan_tier);
-                  if (!allowed) return Alert.alert('Limite Atingido', 'Você atingiu seu limite de armazenamento.');
+                  if (!allowed) return dialog.alert('Limite Atingido', 'Você atingiu seu limite de armazenamento.');
                   setShowRecorder(true);
                 }}
               >

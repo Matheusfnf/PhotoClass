@@ -10,7 +10,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import PagerView from 'react-native-pager-view';
@@ -23,6 +22,7 @@ import { getItem, updateItem, getItems, type Item } from '@/lib/items';
 import { formatFileSize } from '@/lib/files';
 import { checkStorageLimit, textBytes } from '@/lib/storage-stats';
 import { useAuth } from '@/context/AuthContext';
+import { useDialog } from '@/context/DialogContext';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { WebView } from 'react-native-webview';
 import * as Sharing from 'expo-sharing';
@@ -42,6 +42,7 @@ export default function ItemDetailScreen() {
   const colors = AppColors[scheme];
   const router = useRouter();
   const { profile } = useAuth();
+  const dialog = useDialog();
 
   const [item, setItem] = useState<Item | null>(null);
   // Swipe gallery state
@@ -166,7 +167,7 @@ export default function ItemDetailScreen() {
       if (delta > 0) {
         const { allowed } = await checkStorageLimit(delta, profile?.plan_tier);
         if (!allowed) {
-          Alert.alert('Limite Excedido', 'Este texto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade.');
+          dialog.alert('Limite Excedido', 'Este texto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade.');
           return;
         }
       }
@@ -206,7 +207,7 @@ export default function ItemDetailScreen() {
       setUndoTrigger(0);
     } catch (e) {
       console.error(e);
-      Alert.alert('Erro', 'Não foi possível salvar o desenho.');
+      dialog.alert('Erro', 'Não foi possível salvar o desenho.');
     }
   };
 
@@ -237,7 +238,7 @@ export default function ItemDetailScreen() {
       try { await FileSystem.deleteAsync(manipResult.uri); } catch (e) { }
     } catch (error) {
       console.error(error);
-      Alert.alert('Erro', 'Não foi possível alterar a foto.');
+      dialog.alert('Erro', 'Não foi possível alterar a foto.');
     }
   };
 
@@ -272,7 +273,7 @@ export default function ItemDetailScreen() {
 
       try { await FileSystem.deleteAsync(manipResult.uri); } catch (e) { }
     } catch (err) {
-      Alert.alert("Erro", "Falha ao recortar a imagem.");
+      dialog.alert("Erro", "Falha ao recortar a imagem.");
       console.error(err);
     }
   };
@@ -297,12 +298,12 @@ export default function ItemDetailScreen() {
             mimeType: docItem.mime_type || 'application/pdf',
           });
         } else {
-          Alert.alert('Erro', 'O visualizador não está disponível.');
+          dialog.alert('Erro', 'O visualizador não está disponível.');
         }
       }
     } catch (e) {
       console.error('Preview error:', e);
-      Alert.alert('Erro', 'Não foi possível abrir o arquivo.');
+      dialog.alert('Erro', 'Não foi possível abrir o arquivo.');
     }
   };
 
@@ -340,7 +341,7 @@ const handleDownloadItem = async (targetItem: Item) => {
 
   } catch (e) {
     console.error('Failed to download item:', e);
-    Alert.alert('Erro', 'Não foi possível baixar o arquivo da nuvem.');
+    dialog.alert('Erro', 'Não foi possível baixar o arquivo da nuvem.');
   } finally {
     setDownloadingItems(prev => ({ ...prev, [targetItem.id]: false }));
   }

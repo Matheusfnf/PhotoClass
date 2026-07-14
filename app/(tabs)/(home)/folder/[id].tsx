@@ -5,7 +5,6 @@ import {
   FlatList,
   StyleSheet,
   Pressable,
-  Alert,
   Dimensions,
   ActivityIndicator,
   ScrollView,
@@ -26,7 +25,8 @@ import { getItems, createItem, deleteItem, updateItem, type Item } from '@/lib/i
 import { copyFileToAppStorage, moveFileToAppStorage, getFileSize, formatFileSize, deleteFile } from '@/lib/files';
 import { generateId } from '@/lib/uuid';
 import { checkStorageLimit } from '@/lib/storage-stats';
-import { alertOpenSettings } from '@/lib/permissions';
+import { promptOpenSettings } from '@/lib/permissions';
+import { useDialog } from '@/context/DialogContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FAB, type FABAction } from '@/components/ui/FAB';
 import { AudioRecorder } from '@/components/AudioRecorder';
@@ -43,6 +43,7 @@ export default function FolderDetailScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const { profile } = useAuth();
+  const dialog = useDialog();
 
   const [folder, setFolder] = useState<Folder | null>(null);
   const [space, setSpace] = useState<Space | null>(null);
@@ -96,7 +97,7 @@ export default function FolderDetailScreen() {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        alertOpenSettings('camera');
+        promptOpenSettings(dialog.confirm, 'camera');
         return;
       }
 
@@ -109,9 +110,9 @@ export default function FolderDetailScreen() {
         const r = await savePhoto(result.assets[0]);
         setSaving(false);
         if (r === 'quota') {
-          Alert.alert('Limite Excedido', 'Esta foto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade para o Pro.');
+          dialog.alert('Limite Excedido', 'Esta foto ultrapassa seu limite de armazenamento. Libere espaço ou faça upgrade para o Pro.');
         } else if (r === 'error') {
-          Alert.alert('Erro', 'Não foi possível salvar a foto.');
+          dialog.alert('Erro', 'Não foi possível salvar a foto.');
         } else {
           await load();
         }
@@ -119,7 +120,7 @@ export default function FolderDetailScreen() {
     } catch (e) {
       setSaving(false);
       console.error('Camera error:', e);
-      Alert.alert('Erro', 'Falha ao acessar a câmera: ' + String(e));
+      dialog.alert('Erro', 'Falha ao acessar a câmera: ' + String(e));
     }
   };
 
@@ -152,18 +153,18 @@ export default function FolderDetailScreen() {
           const addedMsg = added > 0
             ? `${added} ${added === 1 ? 'foto adicionada' : 'fotos adicionadas'}. `
             : '';
-          Alert.alert(
+          dialog.alert(
             'Limite de armazenamento',
             `${addedMsg}${skipped} ${skipped === 1 ? 'foto não coube' : 'fotos não couberam'} no seu limite. Libere espaço ou faça upgrade para o Pro.`
           );
         } else if (failed > 0) {
-          Alert.alert('Erro', 'Algumas fotos não puderam ser salvas.');
+          dialog.alert('Erro', 'Algumas fotos não puderam ser salvas.');
         }
       }
     } catch (e) {
       setSaving(false);
       console.error('Gallery error:', e);
-      Alert.alert('Erro', 'Falha ao acessar a galeria: ' + String(e));
+      dialog.alert('Erro', 'Falha ao acessar a galeria: ' + String(e));
     }
   };
 
@@ -224,7 +225,7 @@ export default function FolderDetailScreen() {
         const fileSize = asset.size ?? 0;
         const { allowed } = await checkStorageLimit(fileSize, profile?.plan_tier);
         if (!allowed) {
-          Alert.alert('Limite Excedido', `Este documento ultrapassa seu limite de armazenamento.`);
+          dialog.alert('Limite Excedido', `Este documento ultrapassa seu limite de armazenamento.`);
           setSaving(false);
           return;
         }
@@ -246,7 +247,7 @@ export default function FolderDetailScreen() {
     } catch (e) {
       setSaving(false);
       console.error('Document import error:', e);
-      Alert.alert('Erro', 'Falha ao importar documento: ' + String(e));
+      dialog.alert('Erro', 'Falha ao importar documento: ' + String(e));
     }
   };
 
@@ -281,7 +282,7 @@ export default function FolderDetailScreen() {
       load();
     } catch (e) {
       console.error(e);
-      Alert.alert('Erro', 'Falha ao mover o item.');
+      dialog.alert('Erro', 'Falha ao mover o item.');
     }
   };
 
@@ -305,9 +306,13 @@ export default function FolderDetailScreen() {
     try {
       await moveFolderToSpace(folderToMove.id, targetSpaceId);
       load();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to move folder:', e);
-      Alert.alert('Erro', 'Não foi possível mover a pasta.');
+      if (e?.message === 'DUPLICATE_NAME') {
+        dialog.alert('Nome já usado', 'O espaço de destino já tem uma pasta com esse nome. Renomeie antes de mover.');
+      } else {
+        dialog.alert('Erro', 'Não foi possível mover a pasta.');
+      }
     }
   };
 
@@ -325,7 +330,7 @@ export default function FolderDetailScreen() {
       const fileSizeBytes = await getFileSize(uri);
       const { allowed } = await checkStorageLimit(fileSizeBytes, profile?.plan_tier);
       if (!allowed) {
-        Alert.alert('Limite Excedido', `Este áudio ultrapassa seu limite de armazenamento.`);
+        dialog.alert('Limite Excedido', `Este áudio ultrapassa seu limite de armazenamento.`);
         setShowRecorder(false);
         setSaving(false);
         return;
@@ -349,7 +354,7 @@ export default function FolderDetailScreen() {
       await load();
     } catch (e) {
       console.error('Failed to save recording:', e);
-      Alert.alert('Erro', 'Não foi possível salvar a gravação.');
+      dialog.alert('Erro', 'Não foi possível salvar a gravação.');
       setShowRecorder(false);
     } finally {
       setSaving(false);
@@ -369,14 +374,14 @@ export default function FolderDetailScreen() {
       color: '#A29BFE',
       onPress: async () => {
         const { allowed } = await checkStorageLimit(0, profile?.plan_tier);
-        if (!allowed) return Alert.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
+        if (!allowed) return dialog.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
         try {
           // Cria a anotação vazia e abre direto o editor — o autosave cuida do resto.
           const note = await createItem({ folder_id: id!, type: 'note' });
           router.push(`/note/${note.id}`);
         } catch (e) {
           console.error('Failed to create note:', e);
-          Alert.alert('Erro', 'Não foi possível criar a anotação.');
+          dialog.alert('Erro', 'Não foi possível criar a anotação.');
         }
       },
     },
@@ -386,7 +391,7 @@ export default function FolderDetailScreen() {
       color: '#6C5CE7',
       onPress: async () => {
         const { allowed } = await checkStorageLimit(0, profile?.plan_tier);
-        if (!allowed) return Alert.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
+        if (!allowed) return dialog.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
         handleTakePhoto();
       },
     },
@@ -396,7 +401,7 @@ export default function FolderDetailScreen() {
       color: '#00CEC9',
       onPress: async () => {
         const { allowed } = await checkStorageLimit(0, profile?.plan_tier);
-        if (!allowed) return Alert.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
+        if (!allowed) return dialog.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
         handlePickPhoto();
       },
     },
@@ -406,7 +411,7 @@ export default function FolderDetailScreen() {
       color: '#FF7675',
       onPress: async () => {
         const { allowed } = await checkStorageLimit(0, profile?.plan_tier);
-        if (!allowed) return Alert.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
+        if (!allowed) return dialog.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
         setShowRecorder(true);
       },
     },
@@ -416,7 +421,7 @@ export default function FolderDetailScreen() {
       color: '#FDCB6E',
       onPress: async () => {
         const { allowed } = await checkStorageLimit(0, profile?.plan_tier);
-        if (!allowed) return Alert.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
+        if (!allowed) return dialog.alert('Limite Atingido', `Você atingiu seu limite de armazenamento.`);
         handleImportDocument();
       },
     },

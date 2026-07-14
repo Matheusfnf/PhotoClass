@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +20,8 @@ import { AppColors, BorderRadius, FontSize, FontWeight, Shadow, Spacing } from '
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TERMS_URL, PRIVACY_URL } from '@/lib/legal';
+import { isGoogleAuthEnabled } from '@/lib/google-auth';
+import { useDialog } from '@/context/DialogContext';
 
 type Mode = 'login' | 'signup';
 
@@ -32,7 +33,9 @@ const ACCENT_PINK = '#DE27AC';
 export default function AuthScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const dialog = useDialog();
+  const googleEnabled = isGoogleAuthEnabled();
 
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
@@ -43,7 +46,17 @@ export default function AuthScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleGoogle = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    setGoogleLoading(false);
+    if (error) setError(error);
+    // sucesso: o AuthContext atualiza o user e o _layout redireciona
+  };
 
   const isSignup = mode === 'signup';
   // Logo com o nome em indigo — legível no card claro e no escuro.
@@ -94,11 +107,12 @@ export default function AuthScreen() {
     if (result.error) {
       setError(result.error);
     } else if (isSignup) {
-      Alert.alert(
+      await dialog.alert(
         '🎉 Conta criada!',
         'Você já pode começar a usar o PhotoClass. Seus dados serão sincronizados automaticamente.',
-        [{ text: 'Continuar', onPress: () => router.replace('/(tabs)' as any) }]
+        'Continuar'
       );
+      router.replace('/(tabs)' as any);
     }
     // login bem-sucedido: o AuthContext atualiza o user e o _layout redireciona
   };
@@ -309,6 +323,34 @@ export default function AuthScreen() {
                 )}
               </Pressable>
 
+              {/* Login social */}
+              {googleEnabled && (
+                <>
+                  <View style={s.dividerRow}>
+                    <View style={[s.dividerLine, { backgroundColor: colors.borderLight }]} />
+                    <Text style={[s.dividerText, { color: colors.textMuted }]}>ou</Text>
+                    <View style={[s.dividerLine, { backgroundColor: colors.borderLight }]} />
+                  </View>
+                  <Pressable
+                    onPress={handleGoogle}
+                    disabled={googleLoading || loading}
+                    style={({ pressed }) => [
+                      s.googleBtn,
+                      { backgroundColor: colors.background, borderColor: colors.border, opacity: pressed || googleLoading ? 0.7 : 1 },
+                    ]}
+                  >
+                    {googleLoading ? (
+                      <ActivityIndicator size="small" color={colors.text} />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={18} color="#EA4335" />
+                        <Text style={[s.googleBtnText, { color: colors.text }]}>Continuar com Google</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </>
+              )}
+
               {/* Alternar modo */}
               <Pressable onPress={toggleMode} style={s.toggleBtn}>
                 <Text style={[s.toggleText, { color: colors.textSecondary }]}>
@@ -461,6 +503,32 @@ const s = StyleSheet.create({
     color: '#FFF',
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: FontSize.xs,
+  },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    height: 52,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  googleBtnText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
   },
   toggleBtn: {
     alignItems: 'center',

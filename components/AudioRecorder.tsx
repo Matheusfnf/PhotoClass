@@ -5,7 +5,8 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { alertOpenSettings } from '@/lib/permissions';
+import { promptOpenSettings } from '@/lib/permissions';
+import { useDialog } from '@/context/DialogContext';
 
 interface AudioRecorderProps {
   onRecordingComplete: (uri: string, durationSeconds: number) => void;
@@ -15,6 +16,7 @@ interface AudioRecorderProps {
 export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderProps) {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
+  const dialog = useDialog();
 
   const recorder = useAudioRecorder({
     ...RecordingPresets.HIGH_QUALITY,
@@ -61,7 +63,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
     try {
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        alertOpenSettings('microphone');
+        promptOpenSettings(dialog.confirm, 'microphone');
         return;
       }
       // iOS requires explicitly enabling recording mode

@@ -47,12 +47,44 @@ export async function getFolder(id: string): Promise<Folder | null> {
   );
 }
 
+/**
+ * Nome já usado por uma pasta IRMÃ viva (mesmo espaço + mesmo pai)?
+ * Comparação sem espaços nas pontas e case-insensitive (via JS, que trata
+ * acentos — o LOWER do SQLite só cobre ASCII). Escopo pequeno (pastas de um
+ * pai), então buscar e comparar em memória é seguro e correto.
+ *
+ * NÃO impomos isso como constraint no banco de propósito: com o sync
+ * offline-first, dois aparelhos criando o mesmo nome offline fariam o insert
+ * remoto falhar e travar a sincronização. A trava fica no app; a busca mostra
+ * o caminho pra desambiguar qualquer duplicata de corrida.
+ */
+async function folderNameTaken(
+  spaceId: string,
+  parentId: string | null | undefined,
+  name: string,
+  excludeId?: string
+): Promise<boolean> {
+  const db = await getDatabase();
+  const target = name.trim().toLocaleLowerCase();
+  const pid = parentId ?? null;
+  const clause = pid === null ? 'parent_id IS NULL' : 'parent_id = ?';
+  const params: any[] = pid === null ? [spaceId] : [spaceId, pid];
+  const rows = await db.getAllAsync<{ id: string; name: string }>(
+    `SELECT id, name FROM folders WHERE space_id = ? AND ${clause} AND deleted_at IS NULL`,
+    params
+  );
+  return rows.some((r) => r.id !== excludeId && r.name.trim().toLocaleLowerCase() === target);
+}
+
 export async function createFolder(data: {
   space_id: string;
   parent_id?: string | null;
   name: string;
 }): Promise<Folder> {
   const db = await getDatabase();
+  if (await folderNameTaken(data.space_id, data.parent_id, data.name)) {
+    throw new Error('DUPLICATE_NAME');
+  }
   const id = generateId();
   const now = new Date().toISOString();
   await db.runAsync(
@@ -69,6 +101,14 @@ export async function updateFolder(
   const db = await getDatabase();
   const now = new Date().toISOString();
   if (data.name !== undefined) {
+    // Renomear não pode colidir com uma pasta irmã (exclui a própria da checagem).
+    const f = await db.getFirstAsync<{ space_id: string; parent_id: string | null }>(
+      `SELECT space_id, parent_id FROM folders WHERE id = ?`,
+      [id]
+    );
+    if (f && (await folderNameTaken(f.space_id, f.parent_id, data.name, id))) {
+      throw new Error('DUPLICATE_NAME');
+    }
     await db.runAsync(`UPDATE folders SET name = ?, updated_at = ? WHERE id = ?`, [data.name, now, id]);
   }
 }
@@ -83,6 +123,12 @@ export async function updateFolder(
 export async function moveFolderToSpace(id: string, targetSpaceId: string): Promise<void> {
   const db = await getDatabase();
   const now = new Date().toISOString();
+
+  // A pasta vira raiz do espaço destino — não pode colidir com outra raiz de lá.
+  const f = await db.getFirstAsync<{ name: string }>(`SELECT name FROM folders WHERE id = ?`, [id]);
+  if (f && (await folderNameTaken(targetSpaceId, null, f.name, id))) {
+    throw new Error('DUPLICATE_NAME');
+  }
 
   const subtree = `
     WITH RECURSIVE descendants(fid) AS (

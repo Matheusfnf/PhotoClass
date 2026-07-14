@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { BRAND_GRADIENT } from '@/context/DialogContext';
 
 export interface SheetOption {
   label: string;
@@ -47,7 +48,7 @@ export function OptionsSheet({ visible, title, options, onClose }: Props) {
             A "borda" é um LinearGradient por baixo do card (padding = espessura). */}
         <Pressable style={styles.sheetWrap} onPress={() => {}}>
         <LinearGradient
-          colors={[colors.primary, colors.accent]}
+          colors={BRAND_GRADIENT}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradientBorder}

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSync } from '@/context/SyncContext';
 import { supabase } from '@/lib/supabase';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
+import { useDialog } from '@/context/DialogContext';
 
 export default function AccountScreen() {
   const scheme = useColorScheme() ?? 'dark';
@@ -19,6 +20,7 @@ export default function AccountScreen() {
   const [stats, setStats] = useState<StorageStats | null>(null);
   const { user, profile, signOut, refreshProfile } = useAuth();
   const { isSyncing, lastSyncAt, syncError, forceSync, restoreFromCloud } = useSync();
+  const dialog = useDialog();
 
   useFocusEffect(
     useCallback(() => {
@@ -26,49 +28,42 @@ export default function AccountScreen() {
     }, [])
   );
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sair da conta',
-      'Você será redirecionado para a tela de login. Seus dados locais continuam salvos no dispositivo.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sair', style: 'destructive', onPress: signOut },
-      ]
-    );
+  const handleSignOut = async () => {
+    const ok = await dialog.confirm({
+      title: 'Sair da conta',
+      message: 'Você será redirecionado para a tela de login. Seus dados locais continuam salvos no dispositivo.',
+      confirmLabel: 'Sair',
+      destructive: true,
+    });
+    if (ok) signOut();
   };
 
   const [deleting, setDeleting] = useState(false);
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Excluir conta',
-      'Isso apaga PERMANENTEMENTE sua conta, todos os espaços, pastas, arquivos e o backup na nuvem. Não há como desfazer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir tudo',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              // A exclusão da conta de auth roda no servidor (Edge Function) com a
-              // service role — o JWT do usuário vai automático no header.
-              const { error } = await supabase.functions.invoke('delete-account');
-              if (error) throw error;
-              // Limpa o cache local e encerra a sessão.
-              if (user) {
-                const { wipeUserLocalData } = require('@/lib/database');
-                await wipeUserLocalData(user.id);
-              }
-              await supabase.auth.signOut();
-            } catch (e) {
-              Alert.alert('Erro', 'Não foi possível excluir a conta agora. Tente novamente em instantes.');
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteAccount = async () => {
+    const ok = await dialog.confirm({
+      title: 'Excluir conta',
+      message: 'Isso apaga PERMANENTEMENTE sua conta, todos os espaços, pastas, arquivos e o backup na nuvem. Não há como desfazer.',
+      confirmLabel: 'Excluir tudo',
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      // A exclusão da conta de auth roda no servidor (Edge Function) com a
+      // service role — o JWT do usuário vai automático no header.
+      const { error } = await supabase.functions.invoke('delete-account');
+      if (error) throw error;
+      // Limpa o cache local e encerra a sessão.
+      if (user) {
+        const { wipeUserLocalData } = require('@/lib/database');
+        await wipeUserLocalData(user.id);
+      }
+      await supabase.auth.signOut();
+    } catch (e) {
+      dialog.alert('Erro', 'Não foi possível excluir a conta agora. Tente novamente em instantes.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleThemeChange = async (newTheme: string) => {
@@ -80,7 +75,7 @@ export default function AccountScreen() {
     if (user) {
       const { error } = await supabase.from('profiles').update({ theme: newTheme }).eq('id', user.id);
       if (error) {
-        Alert.alert('Erro', 'Não foi possível alterar o tema.');
+        dialog.alert('Erro', 'Não foi possível alterar o tema.');
       } else {
         await refreshProfile();
       }

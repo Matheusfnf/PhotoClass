@@ -6,11 +6,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, Spacing } from '@/constants/design';
+import { useDialog } from '@/context/DialogContext';
 import { createFolder } from '@/lib/folders';
 import { Button } from '@/components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,7 @@ export default function NewFolderScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const { space_id, parent_id } = useLocalSearchParams<{ space_id: string; parent_id?: string }>();
+  const dialog = useDialog();
 
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -26,7 +27,7 @@ export default function NewFolderScreen() {
   const handleSave = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      Alert.alert('Atenção', 'Digite um nome para a pasta.');
+      dialog.alert('Atenção', 'Digite um nome para a pasta.');
       return;
     }
     if (!space_id) return;
@@ -35,9 +36,13 @@ export default function NewFolderScreen() {
     try {
       await createFolder({ space_id, parent_id, name: trimmed });
       router.back();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Erro', 'Não foi possível criar a pasta.');
+      if (e?.message === 'DUPLICATE_NAME') {
+        dialog.alert('Nome já usado', `Já existe uma pasta chamada "${trimmed}" aqui. Escolha outro nome.`);
+      } else {
+        dialog.alert('Erro', 'Não foi possível criar a pasta.');
+      }
     } finally {
       setSaving(false);
     }

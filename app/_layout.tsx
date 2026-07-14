@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PremiumProvider } from '@/context/PremiumContext';
 import { DatabaseProvider } from '@/context/DatabaseContext';
 import { SyncProvider } from '@/context/SyncContext';
+import { DialogProvider } from '@/context/DialogContext';
 import { SyncGate } from '@/components/SyncGate';
 import { AppColors } from '@/constants/design';
 import { initRevenueCat, loginRevenueCat, logoutRevenueCat } from '@/lib/revenuecat';
@@ -81,6 +82,7 @@ function RootLayout() {
         <DatabaseProvider>
           <SyncProvider>
             <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <DialogProvider>
               <AuthGate>
                 <SyncGate>
                   <Stack
@@ -101,6 +103,7 @@ function RootLayout() {
                   </Stack>
                 </SyncGate>
               </AuthGate>
+              </DialogProvider>
               <StatusBar style="auto" />
             </ThemeProvider>
           </SyncProvider>
