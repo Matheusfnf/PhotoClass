@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { signInWithGoogle as googleSignIn, signOutGoogle } from '@/lib/google-auth';
 
 export interface UserProfile {
   id: string;
@@ -21,6 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -32,6 +34,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null }),
+  signInWithGoogle: async () => ({ error: null }),
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -113,6 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, []);
 
+  const signInWithGoogle = useCallback(() => googleSignIn(), []);
+
   const signOut = useCallback(async () => {
     // Empurra mudanças locais pendentes pra nuvem ANTES de sair — senão dados criados
     // pouco antes do logout (que ainda não passaram pelo sync com debounce de 30s) se
@@ -125,11 +130,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.warn('[Auth] Sync final no logout falhou (seguindo mesmo assim):', e);
     }
+    await signOutGoogle(); // limpa a sessão Google (best-effort) pro seletor reaparecer
     await supabase.auth.signOut();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, isLoading, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, session, isLoading, signIn, signUp, signInWithGoogle, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
