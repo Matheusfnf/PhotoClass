@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, ActivityIndicator, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,9 +11,25 @@ import { usePremium } from '@/context/PremiumContext';
 import { useDialog } from '@/context/DialogContext';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/legal';
 
-/** Fallback caso o RevenueCat não devolva a managementURL. */
-const PLAY_SUBSCRIPTIONS_URL =
-  'https://play.google.com/store/account/subscriptions?package=com.matheusfnf.PhotoClass';
+/** Nome da loja e fallback de gestão caso o RevenueCat não devolva a managementURL. */
+const STORE_NAME = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
+const STORE_SUBSCRIPTIONS_URL = Platform.select({
+  ios: 'https://apps.apple.com/account/subscriptions',
+  default: 'https://play.google.com/store/account/subscriptions?package=com.matheusfnf.PhotoClass',
+});
+
+/**
+ * Período da assinatura a partir do pacote do RevenueCat (tipo do pacote ou
+ * período ISO 8601 do produto, ex.: "P1M"). A Apple exige que o período fique
+ * claro junto do preço. Padrão: mensal (é o plano atual).
+ */
+function getPeriod(pkg: any): { suffix: string; label: string } {
+  const type = pkg?.packageType;
+  const iso: string | undefined = pkg?.product?.subscriptionPeriod;
+  if (type === 'ANNUAL' || iso === 'P1Y') return { suffix: '/ano', label: 'anual' };
+  if (type === 'WEEKLY' || iso === 'P1W') return { suffix: '/semana', label: 'semanal' };
+  return { suffix: '/mês', label: 'mensal' };
+}
 
 const { width } = Dimensions.get('window');
 
@@ -67,15 +83,17 @@ export default function PaywallScreen() {
   };
 
   const handleManage = async () => {
-    // Cancelamento/gestão é feito na Play Store (política do Google). Encaminhamos
-    // pra URL de gestão do RevenueCat; se indisponível, pro painel de assinaturas da Play.
-    const url = (await getManagementURL()) ?? PLAY_SUBSCRIPTIONS_URL;
+    // Cancelamento/gestão é sempre feito na loja (política da Apple e do Google).
+    // Usamos a URL de gestão do RevenueCat; se indisponível, a tela de assinaturas da loja.
+    const url = (await getManagementURL()) ?? STORE_SUBSCRIPTIONS_URL;
     try {
       await Linking.openURL(url);
     } catch {
-      dialog.alert('Ops', 'Não foi possível abrir a tela de assinaturas da Play Store.');
+      dialog.alert('Ops', `Não foi possível abrir a tela de assinaturas da ${STORE_NAME}.`);
     }
   };
+
+  const period = getPeriod(packageToBuy);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -167,6 +185,7 @@ export default function PaywallScreen() {
           <>
             <View style={styles.priceContainer}>
               <Text style={[styles.priceValue, { color: colors.text }]}>{priceString}</Text>
+              <Text style={[styles.pricePeriod, { color: colors.textMuted }]}>{period.suffix}</Text>
             </View>
 
             <Pressable onPress={handleSubscribe} disabled={loading}>
@@ -185,6 +204,14 @@ export default function PaywallScreen() {
                 </LinearGradient>
               )}
             </Pressable>
+
+            {/* Divulgação obrigatória de assinatura auto-renovável (Apple 3.1.2) */}
+            <Text style={[styles.disclosure, { color: colors.textMuted }]}>
+              Assinatura {period.label} com renovação automática por {priceString}{period.suffix}. A cobrança
+              é feita na sua conta {STORE_NAME} ao confirmar a compra e renova automaticamente, a menos que
+              seja cancelada pelo menos 24 horas antes do fim do período. Gerencie ou cancele quando quiser
+              nas configurações da sua conta {STORE_NAME}.
+            </Text>
           </>
         )}
 
@@ -194,7 +221,7 @@ export default function PaywallScreen() {
           </Pressable>
           <Text style={{ color: colors.textMuted }}>•</Text>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
-            <Text style={[styles.footerLink, { color: colors.textMuted }]}>Termos</Text>
+            <Text style={[styles.footerLink, { color: colors.textMuted }]}>Termos de Uso</Text>
           </Pressable>
           {!isPremium && <Text style={{ color: colors.textMuted }}>•</Text>}
           {!isPremium && (
@@ -239,9 +266,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(150,150,150,0.1)',
   },
   content: {
-    // Precisa ser MAIOR que a altura do rodapé absoluto (preço + botão + links),
-    // senão os últimos benefícios ficam escondidos atrás dele sem rolagem possível.
-    paddingBottom: 280,
+    // Precisa ser MAIOR que a altura do rodapé absoluto (preço + botão + aviso de
+    // renovação + links), senão os últimos benefícios ficam escondidos atrás dele.
+    paddingBottom: 360,
   },
   hero: {
     alignItems: 'center',
@@ -367,6 +394,12 @@ const styles = StyleSheet.create({
   manageBtnText: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
+  },
+  disclosure: {
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
   },
   footerLinks: {
     flexDirection: 'row',

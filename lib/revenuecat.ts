@@ -15,16 +15,22 @@ const API_KEY_GOOGLE = process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY || '';
  */
 const PREMIUM_ENTITLEMENT = 'PhotoClass Pro';
 
-const hasKeys = () => Boolean(API_KEY_APPLE || API_KEY_GOOGLE);
+// Chave da PLATAFORMA atual. Antes checávamos "existe alguma chave", o que no
+// iPhone (só com a chave do Google) chamava o SDK sem configure() — e no modo
+// sem chave a "simulação" fingia compra aprovada até em produção.
+const PLATFORM_KEY = Platform.OS === 'ios' ? API_KEY_APPLE : API_KEY_GOOGLE;
+let configured = false;
+
+/** True só se o SDK foi configurado de fato nesta plataforma. */
+const hasKeys = () => configured;
 
 export const initRevenueCat = () => {
   try {
-    if (Platform.OS === 'ios' && API_KEY_APPLE) {
-      Purchases.configure({ apiKey: API_KEY_APPLE });
-    } else if (Platform.OS === 'android' && API_KEY_GOOGLE) {
-      Purchases.configure({ apiKey: API_KEY_GOOGLE });
+    if (PLATFORM_KEY) {
+      Purchases.configure({ apiKey: PLATFORM_KEY });
+      configured = true;
     } else {
-      console.log("⚠️ RevenueCat: Chaves não configuradas. Simulação ativa.");
+      console.log(`⚠️ RevenueCat: chave de ${Platform.OS} não configurada. Compras desativadas.`);
     }
   } catch (e) {
     // No Expo Go o módulo nativo (RNPurchases) não existe → configure() lança.
@@ -55,7 +61,7 @@ export const logoutRevenueCat = async () => {
 
 export const getOfferings = async () => {
   try {
-    if (!API_KEY_APPLE && !API_KEY_GOOGLE) return null;
+    if (!hasKeys()) return null;
     const offerings = await Purchases.getOfferings();
     return offerings.current;
   } catch (error) {
@@ -66,11 +72,13 @@ export const getOfferings = async () => {
 
 export const purchasePremium = async (pkg?: any) => {
   try {
-    if (!API_KEY_APPLE && !API_KEY_GOOGLE) {
-      // Simulação para o modo de desenvolvimento enquanto não há chaves
-      return new Promise(resolve => {
-        setTimeout(() => resolve(true), 1500);
-      });
+    if (!hasKeys()) {
+      // Simulação SÓ em desenvolvimento (sem chave da plataforma). Em produção,
+      // sem SDK configurado, a compra simplesmente falha — nunca finge sucesso.
+      if (__DEV__ && !PLATFORM_KEY) {
+        return new Promise(resolve => setTimeout(() => resolve(true), 1500));
+      }
+      return false;
     }
 
     if (!pkg) {
@@ -101,7 +109,7 @@ export const purchasePremium = async (pkg?: any) => {
 
 export const restorePurchases = async () => {
   try {
-    if (!API_KEY_APPLE && !API_KEY_GOOGLE) return false;
+    if (!hasKeys()) return false;
 
     const customerInfo = await Purchases.restorePurchases();
     if (typeof customerInfo.entitlements.active[PREMIUM_ENTITLEMENT] !== "undefined") {

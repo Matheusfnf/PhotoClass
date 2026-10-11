@@ -1,15 +1,19 @@
 {
   "expo": {
-    "name": "photoclass",
+    "name": "PhotoClass",
     "slug": "photoclass",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "photoclass",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.matheusfnf.PhotoClass",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.matheusfnf.PhotoClass",
@@ -56,7 +60,27 @@
           "url": "https://sentry.io/"
         }
       ],
-      "@react-native-google-signin/google-signin"
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.5"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O PhotoClass usa a câmera para você fotografar lousas, cadernos e materiais das suas aulas.",
+          "photosPermission": "O PhotoClass acessa suas fotos para você importar imagens das aulas para seus espaços de estudo."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O PhotoClass usa o microfone para gravar suas aulas e explicações por voz nas suas anotações."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
