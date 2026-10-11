@@ -12,9 +12,56 @@ export interface Folder {
   thumbnail?: string | null;
 }
 
+/**
+ * PASTA-RAIZ DO ESPAÇO
+ *
+ * Itens (fotos, áudios, arquivos, anotações) sempre pertencem a uma pasta. Pra
+ * que o usuário possa adicionar itens DIRETO no espaço, cada espaço tem uma
+ * pasta-raiz invisível: uma linha normal de `folders` cujo id é o próprio id do
+ * espaço. A tela do espaço mostra os itens dela; ela nunca aparece como pasta.
+ *
+ * Por que assim (e não um `space_id` em items):
+ *   • zero mudança de schema — local e Supabase —, e o sync segue igual;
+ *   • id determinístico: dois aparelhos criando a raiz offline geram a MESMA
+ *     linha (o upsert junta), nunca duplicatas;
+ *   • versões antigas do app continuam funcionando: só enxergam uma pasta
+ *     comum chamada "Geral" dentro do espaço.
+ *
+ * Ela é criada sob demanda (ensureRootFolder), na primeira vez que algo é
+ * adicionado ao espaço.
+ */
+export const ROOT_FOLDER_NAME = 'Geral';
+
+export const isRootFolder = (f: { id: string; space_id: string }) => f.id === f.space_id;
+
+/** Garante que a pasta-raiz do espaço existe (e está viva). Devolve o id dela. */
+export async function ensureRootFolder(spaceId: string): Promise<string> {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+  const existing = await db.getFirstAsync<{ deleted_at: string | null }>(
+    `SELECT deleted_at FROM folders WHERE id = ?`,
+    [spaceId]
+  );
+  if (!existing) {
+    await db.runAsync(
+      `INSERT INTO folders (id, space_id, parent_id, name, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?)`,
+      [spaceId, spaceId, ROOT_FOLDER_NAME, now, now]
+    );
+  } else if (existing.deleted_at) {
+    // Foi apagada (ex.: numa versão antiga do app, onde aparece como pasta
+    // comum): revive. O updated_at novo faz o sync propagar.
+    await db.runAsync(
+      `UPDATE folders SET deleted_at = NULL, parent_id = NULL, updated_at = ? WHERE id = ?`,
+      [now, spaceId]
+    );
+  }
+  return spaceId;
+}
+
+/** Pastas de um nível (as do espaço, ou as subpastas de `parentId`). Não inclui a pasta-raiz. */
 export async function getFolders(spaceId: string, parentId: string | null = null): Promise<Folder[]> {
   const db = await getDatabase();
-  const condition = parentId ? 'f.parent_id = ?' : 'f.parent_id IS NULL';
+  const condition = parentId ? 'f.parent_id = ?' : 'f.parent_id IS NULL AND f.id <> f.space_id';
   const params = parentId ? [spaceId, parentId] : [spaceId];
   
   return db.getAllAsync<Folder>(`
@@ -32,7 +79,11 @@ export async function getFolders(spaceId: string, parentId: string | null = null
 
 export async function getAllFoldersBySpace(spaceId: string): Promise<Folder[]> {
   const db = await getDatabase();
-  return db.getAllAsync<Folder>(`SELECT * FROM folders WHERE space_id = ? AND deleted_at IS NULL ORDER BY name ASC`, [spaceId]);
+  // Sem a pasta-raiz: quem lista (ex.: "Mover para…") oferece o próprio espaço como destino.
+  return db.getAllAsync<Folder>(
+    `SELECT * FROM folders WHERE space_id = ? AND id <> space_id AND deleted_at IS NULL ORDER BY name ASC`,
+    [spaceId]
+  );
 }
 
 export async function getFolder(id: string): Promise<Folder | null> {
@@ -70,7 +121,8 @@ async function folderNameTaken(
   const clause = pid === null ? 'parent_id IS NULL' : 'parent_id = ?';
   const params: any[] = pid === null ? [spaceId] : [spaceId, pid];
   const rows = await db.getAllAsync<{ id: string; name: string }>(
-    `SELECT id, name FROM folders WHERE space_id = ? AND ${clause} AND deleted_at IS NULL`,
+    // A pasta-raiz (id = space_id) é invisível: o nome dela não bloqueia ninguém.
+    `SELECT id, name FROM folders WHERE space_id = ? AND ${clause} AND id <> space_id AND deleted_at IS NULL`,
     params
   );
   return rows.some((r) => r.id !== excludeId && r.name.trim().toLocaleLowerCase() === target);

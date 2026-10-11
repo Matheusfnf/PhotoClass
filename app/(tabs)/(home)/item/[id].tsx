@@ -14,7 +14,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import PagerView from 'react-native-pager-view';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, Stack, useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
@@ -27,6 +28,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { WebView } from 'react-native-webview';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { downloadItemFile } from '@/lib/sync';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { ZoomableImage } from '@/components/ui/ZoomableImage';
 import { captureRef } from 'react-native-view-shot';
@@ -311,30 +313,9 @@ const handleDownloadItem = async (targetItem: Item) => {
   if (!targetItem.storage_key) return;
   setDownloadingItems(prev => ({ ...prev, [targetItem.id]: true }));
   try {
-    const { downloadFile } = require('@/lib/sync');
-    const ext = targetItem.storage_key.split('.').pop() ?? 'bin';
-    const folder = targetItem.type === 'photo' ? 'photos' : targetItem.type === 'audio' ? 'audio' : 'documents';
-    const baseDir = FileSystem.documentDirectory + 'photoclass/';
-    const targetDir = `${baseDir}${folder}/`;
-    const targetUri = `${targetDir}${targetItem.id}.${ext}`;
-
-    const dirInfo = await FileSystem.getInfoAsync(targetDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(targetDir, { intermediates: true });
-    }
-
-    await downloadFile(targetItem.storage_key, targetUri);
-
-    const now = new Date().toISOString();
-    await updateItem(targetItem.id, {});
-    // updateItem() currently doesn't update file_uri directly without custom queries, but wait...
-    // Let's use getDatabase direct run to ensure we bypass strictly defined updateItem type if needed
-    // Actually `updateItem` doesn't update file_uri. We can run raw SQL.
-    const { getDatabase } = require('@/lib/database');
-    const db = await getDatabase();
-    await db.runAsync(`UPDATE items SET file_uri = ?, updated_at = ? WHERE id = ?`, [targetUri, now, targetItem.id]);
-
-    const updatedItem = { ...targetItem, file_uri: targetUri, updated_at: now };
+    // Baixa, grava o caminho no banco (arquivo + miniatura) e devolve o que mudou.
+    const downloaded = await downloadItemFile(targetItem);
+    const updatedItem = { ...targetItem, ...downloaded };
 
     setFolderItems(prev => prev.map(p => p.id === targetItem.id ? updatedItem : p));
     if (item && targetItem.id === item.id) setItem(updatedItem);
@@ -580,7 +561,15 @@ const renderEditModal = () => (
   </Modal>
 );
 
-if (!currentItem) return null;
+// Carregando (ou item não encontrado): o cabeçalho já aparece, pra tela nunca
+// ficar sem saída.
+if (!currentItem) {
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="" />
+    </View>
+  );
+}
 
 let drawW = SCREEN_WIDTH;
 let drawH = Dimensions.get('window').height * 0.8;
@@ -595,16 +584,8 @@ if (imgDims.width > 0 && imgDims.height > 0) {
 
 return (
   <View style={[styles.container, { backgroundColor: colors.background }]}>
-    <Stack.Screen
-      options={{
-        headerTransparent: false,
-        headerStyle: undefined,
-        headerTintColor: undefined,
-        title: currentItem.title ?? (currentItem.type === 'photo' ? 'Foto' : currentItem.type === 'audio' ? 'Áudio' : 'Documento'),
-        headerShown: true,
-        headerLeft: undefined,
-
-      }}
+    <ScreenHeader
+      title={currentItem.title ?? (currentItem.type === 'photo' ? 'Foto' : currentItem.type === 'audio' ? 'Áudio' : 'Documento')}
     />
     {renderActionBar()}
 

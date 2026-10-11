@@ -9,12 +9,15 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   spaceId: string;
+  /** Nome do espaço, pra oferecer "direto no espaço" como destino. */
+  spaceName?: string;
+  /** Onde o item está agora (id da pasta, ou do espaço se estiver solto nele). */
   currentFolderId: string;
   onSelectFolder: (folderId: string) => void;
   title?: string;
 }
 
-export const FolderPickerModal = ({ visible, onClose, spaceId, currentFolderId, onSelectFolder, title = "Mover para..." }: Props) => {
+export const FolderPickerModal = ({ visible, onClose, spaceId, spaceName, currentFolderId, onSelectFolder, title = "Mover para..." }: Props) => {
   const scheme = useColorScheme() ?? 'dark';
   const colors = AppColors[scheme];
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -65,7 +68,24 @@ export const FolderPickerModal = ({ visible, onClose, spaceId, currentFolderId, 
           </View>
           
           <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: Spacing.xl }}>
-            {folderPaths.length === 0 ? (
+            {/* Direto no espaço (fora de qualquer pasta). O id do destino é o do
+                próprio espaço — é o id da pasta-raiz dele (ver lib/folders.ts). */}
+            {currentFolderId !== spaceId && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.folderItem,
+                  { borderBottomColor: colors.borderLight, backgroundColor: pressed ? colors.background : 'transparent' }
+                ]}
+                onPress={() => onSelectFolder(spaceId)}
+              >
+                <Ionicons name="albums-outline" size={24} color={colors.primary} />
+                <Text style={[styles.folderItemText, { color: colors.text }]} numberOfLines={2}>
+                  {spaceName ? `${spaceName} (fora das pastas)` : 'Direto no espaço'}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </Pressable>
+            )}
+            {folderPaths.length === 0 && currentFolderId !== spaceId ? null : folderPaths.length === 0 ? (
               <Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: Spacing.xl }}>
                 Nenhuma outra pasta encontrada neste espaço.
               </Text>

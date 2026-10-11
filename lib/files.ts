@@ -1,6 +1,13 @@
 import * as FS from 'expo-file-system/legacy';
 
-const BASE_DIR = FS.documentDirectory + 'photoclass/';
+/**
+ * Raiz dos arquivos do app no aparelho. ATENÇÃO (iOS): o `documentDirectory`
+ * inclui o UUID do container do app, que MUDA quando o app é atualizado ou
+ * restaurado de backup. Os arquivos sobrevivem, mas um caminho absoluto salvo
+ * antes deixa de valer — por isso o banco corrige os caminhos a cada abertura
+ * (ver rebaseStoredPaths em lib/database.ts).
+ */
+export const BASE_DIR = FS.documentDirectory + 'photoclass/';
 const DIRS = {
   photos: BASE_DIR + 'photos/',
   audio: BASE_DIR + 'audio/',

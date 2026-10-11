@@ -25,6 +25,15 @@ export interface Item {
   deleted_at: string | null;
 }
 
+/**
+ * Caminho local da imagem de preview de um item, ou '' se o arquivo ainda não
+ * está no aparelho (só na nuvem). Usa `||` de propósito: linhas antigas vindas
+ * do sync têm thumbnail '' (string vazia), que não pode vencer o file_uri.
+ */
+export function previewUri(item: Pick<Item, 'thumbnail' | 'file_uri'>): string {
+  return item.thumbnail || item.file_uri || '';
+}
+
 export async function getItems(folderId: string): Promise<Item[]> {
   const db = await getDatabase();
   // parent_id IS NULL: anexos (ex.: áudio de uma foto) não aparecem soltos na

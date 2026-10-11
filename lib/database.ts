@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { captureError } from './sentry';
+import { BASE_DIR } from './files';
 
 // ─── Cache de conexões por usuário ────────────────────────────────────────────
 // NUNCA fechamos uma conexão durante a sessão. Fechar/reabrir a conexão do
@@ -72,6 +73,7 @@ async function openConnection(userId: string): Promise<SQLite.SQLiteDatabase> {
       raw = await SQLite.openDatabaseAsync(dbName(userId));
       const db = serializeDatabase(raw);
       await runMigrations(db); // 1ª PRAGMA valida o handle; se nasceu morto → NPE → retry
+      await rebaseStoredPaths(db);
       return db;
     } catch (e) {
       lastErr = e;
@@ -84,6 +86,44 @@ async function openConnection(userId: string): Promise<SQLite.SQLiteDatabase> {
   // Reportamos só a FALHA da cura (curas bem-sucedidas são esperadas e seriam ruído).
   captureError(lastErr, 'database', { phase: 'openConnection', attempts: 6 });
   throw lastErr;
+}
+
+// Trecho que identifica, dentro de um caminho salvo, onde começa a parte que
+// independe do aparelho/instalação: tudo depois de ".../photoclass/".
+const FILES_MARKER = '/photoclass/';
+
+/**
+ * Reaponta os caminhos de arquivo salvos (items.file_uri / items.thumbnail)
+ * para a pasta de arquivos ATUAL do app. Roda a cada abertura do banco.
+ *
+ * Por quê: o banco guarda caminhos absolutos, e no iOS o caminho do container
+ * do app (…/Application/<UUID>/Documents/) muda quando o app é atualizado pela
+ * App Store/TestFlight ou restaurado de backup. Os arquivos continuam lá, mas
+ * os caminhos antigos passam a apontar pro nada: todas as fotos sumiriam e, no
+ * sync seguinte, o pull as marcaria como "só na nuvem".
+ *
+ * Em uso normal não altera nenhuma linha (um UPDATE que não casa com nada).
+ * Não mexe em updated_at: caminho local é estado do aparelho, não uma edição.
+ * Nunca impede o app de abrir — se falhar, só registra.
+ */
+async function rebaseStoredPaths(db: SQLite.SQLiteDatabase) {
+  // Web não tem documentDirectory; BASE_DIR vira "nullphotoclass/".
+  if (!BASE_DIR.startsWith('file://')) return;
+  try {
+    for (const column of ['file_uri', 'thumbnail']) {
+      await db.runAsync(
+        `UPDATE items
+            SET ${column} = ? || substr(${column}, instr(${column}, ?) + ?)
+          WHERE instr(${column}, ?) > 0
+            AND substr(${column}, 1, ?) <> ?`,
+        [BASE_DIR, FILES_MARKER, FILES_MARKER.length, FILES_MARKER, BASE_DIR.length, BASE_DIR]
+      );
+    }
+  } catch (e) {
+    if (isDeadHandleError(e)) throw e; // handle morto → deixa o retry do openConnection agir
+    console.warn('[DB] Falha ao reapontar caminhos de arquivo:', e);
+    captureError(e, 'database', { phase: 'rebaseStoredPaths' });
+  }
 }
 
 /**

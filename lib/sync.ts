@@ -79,6 +79,48 @@ export async function downloadFile(
   });
 }
 
+/** Caminho local onde fica o arquivo de um item baixado da nuvem (cria a pasta). */
+async function localTargetFor(item: { id: string; type: string; storage_key: string }): Promise<string> {
+  const ext = item.storage_key.split('.').pop() ?? 'bin';
+  const folder = item.type === 'photo' ? 'photos' : item.type === 'audio' ? 'audio' : 'documents';
+  const targetDir = `${FS.documentDirectory}photoclass/${folder}/`;
+  const dirInfo = await FS.getInfoAsync(targetDir);
+  if (!dirInfo.exists) {
+    await FS.makeDirectoryAsync(targetDir, { intermediates: true });
+  }
+  return `${targetDir}${item.id}.${ext}`;
+}
+
+/**
+ * Download sob demanda: traz pro aparelho o arquivo de um item que só existe na
+ * nuvem (plano gratuito não baixa tudo no sync) e grava o caminho no banco.
+ * Devolve os campos alterados, pra tela atualizar o item em memória.
+ *
+ * Em fotos a miniatura É o próprio arquivo — então o `thumbnail` é gravado
+ * junto. Sem isso a foto baixava mas a grade da pasta seguia sem preview.
+ *
+ * NÃO mexe em updated_at: o caminho local é estado deste aparelho, não uma
+ * edição do item — não há o que sincronizar.
+ */
+export async function downloadItemFile(item: {
+  id: string;
+  type: string;
+  storage_key: string | null;
+  thumbnail: string | null;
+}): Promise<{ file_uri: string; thumbnail: string | null }> {
+  if (!item.storage_key) throw new Error('Item sem arquivo na nuvem');
+
+  const targetUri = await localTargetFor({ ...item, storage_key: item.storage_key });
+  await downloadFile(item.storage_key, targetUri);
+
+  const thumbnail = item.type === 'photo' ? targetUri : item.thumbnail;
+  const db = await getDatabase();
+  await db.runAsync(`UPDATE items SET file_uri = ?, thumbnail = ? WHERE id = ?`, [
+    targetUri, thumbnail, item.id,
+  ]);
+  return { file_uri: targetUri, thumbnail };
+}
+
 // ─── PUSH: envia dados locais modificados ao Supabase ───────────────────────
 
 async function pushToCloud(userId: string, sinceAt: string, planTier: 'free' | 'premium') {
@@ -416,17 +458,8 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
     // Se o item não existe localmente ou o arquivo foi perdido
     if (ri.storage_key && (!localUri || localUri === '' || !(await FS.getInfoAsync(localUri)).exists)) {
       if (planTier === 'premium') {
-        const ext = ri.storage_key.split('.').pop() ?? 'bin';
-        const folder = ri.type === 'photo' ? 'photos' : ri.type === 'audio' ? 'audio' : 'documents';
-        const baseDir = FS.documentDirectory + 'photoclass/';
-        const targetDir = `${baseDir}${folder}/`;
-        const targetUri = `${targetDir}${ri.id}.${ext}`;
-
         try {
-          const dirInfo = await FS.getInfoAsync(targetDir);
-          if (!dirInfo.exists) {
-            await FS.makeDirectoryAsync(targetDir, { intermediates: true });
-          }
+          const targetUri = await localTargetFor({ id: ri.id, type: ri.type, storage_key: ri.storage_key });
           await downloadFile(ri.storage_key, targetUri);
           localUri = targetUri;
         } catch (err) {
@@ -454,13 +487,17 @@ async function pullFromCloud(userId: string, sinceAt: string, planTier: 'free' |
          folder_id   = excluded.folder_id,
          parent_id   = excluded.parent_id,
          file_uri    = excluded.file_uri,
+         thumbnail   = COALESCE(excluded.thumbnail, items.thumbnail),
          updated_at  = excluded.updated_at,
          storage_key = excluded.storage_key,
          synced_at   = excluded.synced_at
        WHERE excluded.updated_at > items.updated_at`,
       [
         ri.id, ri.folder_id, ri.parent_id ?? null, ri.type, ri.title ?? null,
-        localUri, localUri,
+        // Miniatura = o próprio arquivo, só em fotos e só se ele está no aparelho.
+        // (Antes gravava '' quando o arquivo ficava na nuvem, e '' não é "sem
+        // miniatura" pra quem lê: a grade tentava exibir um caminho vazio.)
+        localUri, ri.type === 'photo' && localUri ? localUri : null,
         ri.duration ?? null, ri.mime_type ?? null, ri.file_size ?? null,
         ri.notes ?? null, ri.created_at, ri.updated_at,
         ri.storage_key ?? null, new Date().toISOString(),

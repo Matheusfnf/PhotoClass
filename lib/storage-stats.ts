@@ -19,7 +19,7 @@ export async function getStorageStats(): Promise<StorageStats> {
     `SELECT COUNT(*) as count FROM spaces WHERE deleted_at IS NULL`
   );
   const folders = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count FROM folders WHERE deleted_at IS NULL`
+    `SELECT COUNT(*) as count FROM folders WHERE deleted_at IS NULL AND id <> space_id`
   );
   const items = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count FROM items WHERE deleted_at IS NULL`

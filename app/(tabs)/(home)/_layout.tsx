@@ -9,19 +9,22 @@ export default function HomeLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: colors.text,
-        headerShadowVisible: false,
+        headerShown: false,
         animation: 'slide_from_right',
+        // Sem isso o fundo é o do tema padrão do navigator (claro/escuro do
+        // sistema, não o tema do app) e aparece num flash durante a transição.
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false, title: 'Espaços' }} />
-      <Stack.Screen name="space/[id]" options={{ title: '', headerBackTitle: 'Espaços' }} />
-      <Stack.Screen name="folder/[id]" options={{ title: '', headerBackTitle: 'Voltar' }} />
-      <Stack.Screen name="item/[id]" options={{ title: '', headerTransparent: true, headerBackTitle: 'Voltar' }} />
-      <Stack.Screen name="note/[id]" options={{ title: 'Anotações', headerBackTitle: 'Voltar' }} />
+      {/* Todas as telas desenham o próprio cabeçalho (components/ui/ScreenHeader).
+          O header nativo piscava ao ser reconfigurado durante a transição e,
+          misturado com telas sem header, deixava o botão de voltar do iOS sem
+          responder — então NENHUMA tela deste stack usa o nativo. */}
+      <Stack.Screen name="space/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="folder/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="note/[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { openDatabaseForUser, closeDatabase } from '@/lib/database';
+import { clearBrowseCache } from '@/lib/browse';
 import { useAuth } from '@/context/AuthContext';
 import type * as SQLite from 'expo-sqlite';
 
@@ -29,6 +30,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    // Trocou a conta (ou saiu): o cache de telas era do banco anterior.
+    clearBrowseCache();
+
     // Sem usuário → fecha banco e marca não-pronto
     if (!user) {
       closeDatabase().then(() => {

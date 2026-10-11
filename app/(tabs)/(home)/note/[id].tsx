@@ -10,19 +10,18 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors, BorderRadius, FontSize, FontWeight, Spacing } from '@/constants/design';
-import { getItem, getChildAudios, type Item } from '@/lib/items';
+import { getItem, getChildAudios, previewUri, type Item } from '@/lib/items';
 import { useSyncedMutations } from '@/hooks/use-synced-mutations';
 import { checkStorageLimit, textBytes } from '@/lib/storage-stats';
 import { moveFileToAppStorage, getFileSize, deleteFile, formatFileSize } from '@/lib/files';
 import { generateId } from '@/lib/uuid';
-import { getDatabase } from '@/lib/database';
-import { downloadFile } from '@/lib/sync';
+import { downloadItemFile } from '@/lib/sync';
 import { useAuth } from '@/context/AuthContext';
 import { useDialog } from '@/context/DialogContext';
 import { captureError } from '@/lib/sentry';
@@ -266,17 +265,7 @@ export default function NoteScreen() {
     if (!audio.storage_key) return;
     setDownloading((prev) => ({ ...prev, [audio.id]: true }));
     try {
-      const targetDir = FileSystem.documentDirectory + 'photoclass/audio/';
-      const dirInfo = await FileSystem.getInfoAsync(targetDir);
-      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(targetDir, { intermediates: true });
-      const ext = audio.storage_key.split('.').pop() ?? 'm4a';
-      const targetUri = `${targetDir}${audio.id}.${ext}`;
-      await downloadFile(audio.storage_key, targetUri);
-
-      const db = await getDatabase();
-      await db.runAsync(`UPDATE items SET file_uri = ?, updated_at = ? WHERE id = ?`, [
-        targetUri, new Date().toISOString(), audio.id,
-      ]);
+      await downloadItemFile(audio);
       if (itemRef.current) setAudios(await getChildAudios(itemRef.current.id));
     } catch (e) {
       console.error('Failed to download attached audio:', e);
@@ -288,7 +277,15 @@ export default function NoteScreen() {
 
   // ── UI ──────────────────────────────────────────────────────────────────────
 
-  if (!item) return null;
+  // Carregando (ou item não encontrado): o cabeçalho já aparece, pra tela nunca
+  // ficar sem saída.
+  if (!item) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScreenHeader title="" />
+      </View>
+    );
+  }
 
   const isStandaloneNote = item.type === 'note';
   // A dica contextual diz DE QUE o áudio anexado trata — inclusive quando o item
@@ -309,18 +306,10 @@ export default function NoteScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          title: isStandaloneNote ? 'Anotação' : 'Anotações',
-          headerRight: () => (
-            <Text style={{
-              fontSize: FontSize.xs,
-              color: saveState === 'blocked' ? '#FF7675' : colors.textMuted,
-            }}>
-              {saveLabel}
-            </Text>
-          ),
-        }}
+      <ScreenHeader
+        title={isStandaloneNote ? 'Anotação' : 'Anotações'}
+        subtitle={saveLabel}
+        subtitleColor={saveState === 'blocked' ? '#FF7675' : undefined}
       />
 
       {showRecorder ? (
@@ -340,9 +329,9 @@ export default function NoteScreen() {
             {/* Contexto do item pai (quando a anotação pertence a uma foto/áudio/doc) */}
             {!isStandaloneNote && (
               <View style={[styles.parentCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-                {item.type === 'photo' && item.file_uri ? (
+                {item.type === 'photo' && previewUri(item) ? (
                   <Image
-                    source={{ uri: `${item.thumbnail ?? item.file_uri}?t=${item.updated_at}` }}
+                    source={{ uri: `${previewUri(item)}?t=${item.updated_at}` }}
                     style={styles.parentThumb}
                     contentFit="cover"
                   />

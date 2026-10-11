@@ -18,6 +18,7 @@ import { useDatabaseReady } from '@/context/DatabaseContext';
 import { useSync } from '@/context/SyncContext';
 import { getAllSpaces, deleteSpace, createSpace, type Space } from '@/lib/spaces';
 import { createFolder } from '@/lib/folders';
+import { openSpace } from '@/lib/browse';
 import { SpaceCard } from '@/components/SpaceCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
@@ -204,7 +205,7 @@ export default function HomeScreen() {
           renderItem={({ item }) => (
             <SpaceCard
               space={item}
-              onPress={() => router.push(`/space/${item.id}`)}
+              onPress={() => openSpace(item)}
               onLongPress={() => handleSpaceMenu(item)}
               onMenuPress={() => handleSpaceMenu(item)}
             />

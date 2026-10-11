@@ -17,7 +17,7 @@ export async function getAllSpaces(): Promise<Space[]> {
   return db.getAllAsync<Space>(`
     SELECT
       s.*,
-      COUNT(DISTINCT f.id) as folder_count,
+      COUNT(DISTINCT CASE WHEN f.id <> s.id THEN f.id END) as folder_count,
       COUNT(DISTINCT i.id) as item_count
     FROM spaces s
     LEFT JOIN folders f ON f.space_id = s.id AND f.deleted_at IS NULL
@@ -33,7 +33,7 @@ export async function getSpace(id: string): Promise<Space | null> {
   return db.getFirstAsync<Space>(
     `SELECT
        s.*,
-       COUNT(DISTINCT f.id) as folder_count,
+       COUNT(DISTINCT CASE WHEN f.id <> s.id THEN f.id END) as folder_count,
        COUNT(DISTINCT i.id) as item_count
      FROM spaces s
      LEFT JOIN folders f ON f.space_id = s.id AND f.deleted_at IS NULL
